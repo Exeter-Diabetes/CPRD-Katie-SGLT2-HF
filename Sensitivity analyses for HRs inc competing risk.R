@@ -765,15 +765,13 @@ cuminc(Surv(mace_broad_censtime_yrs, mace_broad_censvar.cr) ~ studydrug, data = 
 # Adjusted 'hazard ratios'
 
 # competing risk regression
-crr(Surv(hf_broad_itt_censtime_yrs, hf_broad_itt_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
+crr(Surv(mace_broad_censtime_yrs, mace_broad_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tbl_regression(exp = TRUE)
-
-studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx
 
 ##SGLT2	0.76	0.68, 0.85	<0.001
 
 # coxph comparison
-coxph(Surv(hf_broad_itt_censtime_yrs, hf_broad_itt_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
+coxph(Surv(mace_broad_censtime_yrs, mace_broad_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tidy(conf.int = TRUE, exponentiate = TRUE) %>% 
   select(term, estimate, starts_with("conf"))
 
@@ -831,13 +829,13 @@ cuminc(Surv(hf_broad_censtime_yrs, hf_broad_censvar.cr) ~ studydrug, data = coho
 # Adjusted 'hazard ratios'
 
 # competing risk regression
-crr(Surv(hf_broad_itt_censtime_yrs, hf_broad_itt_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
+crr(Surv(hf_broad_censtime_yrs, hf_broad_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tbl_regression(exp = TRUE)
 
 ##SGLT2	0.76	0.68, 0.85	<0.001
 
 # coxph comparison
-coxph(Surv(hf_broad_itt_censtime_yrs, hf_broad_itt_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
+coxph(Surv(hf_broad_censtime_yrs, hf_broad_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tidy(conf.int = TRUE, exponentiate = TRUE) %>% 
   select(term, estimate, starts_with("conf"))
 
@@ -895,13 +893,13 @@ cuminc(Surv(hosp_censtime_yrs, hosp_censvar.cr) ~ studydrug, data = cohort.agecu
 # Adjusted 'hazard ratios'
 
 # competing risk regression
-crr(Surv(hosp_itt_censtime_yrs, hosp_itt_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
+crr(Surv(hosp_censtime_yrs, hosp_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tbl_regression(exp = TRUE)
 
 ##SGLT2	0.76	0.68, 0.85	<0.001
 
 # coxph comparison
-coxph(Surv(hosp_itt_censtime_yrs, hosp_itt_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
+coxph(Surv(hosp_censtime_yrs, hosp_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tidy(conf.int = TRUE, exponentiate = TRUE) %>% 
   select(term, estimate, starts_with("conf"))
 
