@@ -45,13 +45,13 @@ source("cohort_definition_function.R")
 cohort <- define_cohort(t2d_1stinstance, t2d_all_drug_periods)
 
 write.table(count(cohort, studydrug), quote=F, col.names=F, row.names=F, sep=" ")
-# DPP4SU 90904
-# GLP1 12607
-# SGLT2 48304
+# DPP4SU 90853
+# GLP1 12604
+# SGLT2 48279
 
 cohort <- cohort %>%
   filter(studydrug!="GLP1") %>%
-  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preckdstage, qrisk2_smoking_cat, postdrug_first_myocardialinfarction, postdrug_first_primary_incident_mi, postdrug_first_stroke, postdrug_first_primary_incident_stroke, postdrug_first_heartfailure, postdrug_first_primary_hhf, postdrug_first_all_cause_hosp, next_glp1_start, next_sglt2_start, next_tzd_start, last_sglt2_stop, cv_death_date_primary_cause, cv_death_date_any_cause, hf_death_date_primary_cause, hf_death_date_any_cause, qrisk2_lin_predictor, qrisk2_5yr_score, qrisk2_10yr_score, qdiabeteshf_lin_predictor, qdiabeteshf_5yr_score)
+  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preckdstage, qrisk2_smoking_cat, postdrug_first_myocardialinfarction, postdrug_first_primary_incident_mi, postdrug_first_stroke, postdrug_first_primary_incident_stroke, postdrug_first_heartfailure, postdrug_first_primary_hhf, postdrug_first_all_cause_hosp, next_glp1_start, next_sglt2_start, next_tzd_start, last_sglt2_stop, cv_death_date_primary_cause, cv_death_date_any_cause, hf_death_date_primary_cause, hf_death_date_any_cause, qrisk2_lin_predictor, qrisk2_5yr_score, qrisk2_10yr_score, qdiabeteshf_lin_predictor, qdiabeteshf_5yr_score, contains("statins"))
 
 rm(list=setdiff(ls(), "cohort"))
 
@@ -445,14 +445,14 @@ unique_patid_cohort <- cohort %>%
   mutate(earliest_drug_start=min(dstartdate, na.rm=TRUE)) %>%
   ungroup() %>%
   filter(dstartdate==earliest_drug_start)
-#118,653
+#118,589
 
 unique_patid_cohort %>% distinct(patid) %>% count()
-#118,653
+#118,589
 
 table(unique_patid_cohort$studydrug)
-#SGLT2: 29,684
-#DPP4SU: 88,969
+#SGLT2: 29,670
+#DPP4SU: 88,919
 
 
 
@@ -464,8 +464,8 @@ one_year_reg_cohort <- cohort %>%
   filter(reg_before_drug_start>=365 & (is.na(last_sglt2_stop) | last_sglt2_stop>=365))
 
 table(one_year_reg_cohort$studydrug)
-#SGLT2: 47,151
-#DPP4SU: 87,261
+#SGLT2: 47,127
+#DPP4SU: 87,214
 
 
 ############################################################################################
@@ -721,18 +721,12 @@ library(ggsurvfit)
 # Add death as a competing risk
 ## New variable = 0 if censored for other reasons than death, 1 if outcome, 2 if death
 cohort <- cohort %>% 
-  mutate(mace_broad_censvar.cr=ifelse(mace_broad_censvar==0 & death_date==mace_broad_censdate, 2, mace_broad_censvar))
+  mutate(mace_broad_censvar.cr=as.factor(ifelse(mace_broad_censvar==0 & !is.na(death_date) & death_date==mace_broad_censdate, 2, mace_broad_censvar)))
 
-cohort <- cohort %>%
-  mutate(mace_broad_censvar.cr=ifelse(is.na(mace_broad_censvar.cr), 0, mace_broad_censvar.cr))
-
-table(cohort$mace_broad_censvar.cr)
 describe(cohort$mace_broad_censvar.cr)
 ## 3.3% getting outcome, 1.4% dying of other causes
-
-
-cohort <- cohort %>%
-  mutate(mace_broad_censvar.cr=as.factor(mace_broad_censvar.cr))
+table(cohort$studydrug, cohort$mace_broad_censvar.cr)
+prop.table(table(cohort$studydrug, cohort$mace_broad_censvar.cr), margin=1)
 
 
 # Plot cumulative incidence adjusted for competing risk of death
@@ -761,21 +755,20 @@ cuminc(Surv(mace_broad_censtime_yrs, mace_broad_censvar.cr) ~ studydrug, data = 
   add_risktable()
 
 
-
-# Adjusted 'hazard ratios'
+# Adjusted 'hazard ratios'for whole cohort
 
 # competing risk regression
 crr(Surv(mace_broad_censtime_yrs, mace_broad_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tbl_regression(exp = TRUE)
 
-##SGLT2	0.76	0.68, 0.85	<0.001
+##SGLT2	0.86	0.79, 0.93	<0.001
 
 # coxph comparison
 coxph(Surv(mace_broad_censtime_yrs, mace_broad_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tidy(conf.int = TRUE, exponentiate = TRUE) %>% 
   select(term, estimate, starts_with("conf"))
 
-## studydrugSGLT2           0.759    0.680     0.848
+## studydrugSGLT2           0.86    0.80     0.93 as previously
 
 
 
@@ -785,45 +778,12 @@ coxph(Surv(mace_broad_censtime_yrs, mace_broad_censvar) ~ studydrug + dstartdate
 # Add death as a competing risk
 ## New variable = 0 if censored for other reasons than death, 1 if outcome, 2 if death
 cohort <- cohort %>% 
-  mutate(hf_broad_censvar.cr=ifelse(hf_broad_censvar==0 & death_date==hf_broad_censdate, 2, hf_broad_censvar))
+  mutate(hf_broad_censvar.cr=as.factor(ifelse(hf_broad_censvar==0 & !is.na(death_date) & death_date==hf_broad_censdate, 2, hf_broad_censvar)))
 
-cohort <- cohort %>%
-  mutate(hf_broad_censvar.cr=ifelse(is.na(hf_broad_censvar.cr), 0, hf_broad_censvar.cr))
-
-table(cohort$hf_broad_censvar.cr)
 describe(cohort$hf_broad_censvar.cr)
-## 3.3% getting outcome, 1.4% dying of other causes
-
-
-cohort <- cohort %>%
-  mutate(hf_broad_censvar.cr=as.factor(hf_broad_censvar.cr))
-
-
-# Plot cumulative incidence adjusted for competing risk of death
-cuminc(Surv(hf_broad_censtime_yrs, hf_broad_censvar.cr) ~ studydrug, data = cohort) %>% 
-  ggcuminc() + 
-  labs(
-    x = "Years"
-  ) + 
-  add_confidence_interval() +
-  add_risktable()
-
-
-# Just look at over 70s and compare to survival without competing risk
-agecut <- 70
-ggsurvplot(survfit(Surv(hf_broad_censtime_yrs, hf_broad_censvar) ~ studydrug, data = cohort, subset=dstartdate_age>agecut),fun = function(x) {100 - x*100})
-
-cohort.agecut <- cohort %>% 
-  filter(dstartdate_age>agecut)
-
-cuminc(Surv(hf_broad_censtime_yrs, hf_broad_censvar.cr) ~ studydrug, data = cohort.agecut) %>% 
-  ggcuminc() + 
-  labs(
-    x = "Years"
-  ) + 
-  add_confidence_interval() +
-  add_risktable()
-
+## 1.8% getting outcome, 2.0% death
+table(cohort$studydrug, cohort$hf_broad_censvar.cr)
+prop.table(table(cohort$studydrug, cohort$hf_broad_censvar.cr), margin=1)
 
 
 # Adjusted 'hazard ratios'
@@ -832,14 +792,14 @@ cuminc(Surv(hf_broad_censtime_yrs, hf_broad_censvar.cr) ~ studydrug, data = coho
 crr(Surv(hf_broad_censtime_yrs, hf_broad_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tbl_regression(exp = TRUE)
 
-##SGLT2	0.76	0.68, 0.85	<0.001
+##SGLT2	0.77	0.69, 0.86	<0.001
 
 # coxph comparison
 coxph(Surv(hf_broad_censtime_yrs, hf_broad_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tidy(conf.int = TRUE, exponentiate = TRUE) %>% 
   select(term, estimate, starts_with("conf"))
 
-## studydrugSGLT2           0.759    0.680     0.848
+## studydrugSGLT2           0.77    0.69     0.86
 
 
 
@@ -849,45 +809,12 @@ coxph(Surv(hf_broad_censtime_yrs, hf_broad_censvar) ~ studydrug + dstartdate_age
 # Add death as a competing risk
 ## New variable = 0 if censored for other reasons than death, 1 if outcome, 2 if death
 cohort <- cohort %>% 
-  mutate(hosp_censvar.cr=ifelse(hosp_censvar==0 & death_date==hosp_censdate, 2, hosp_censvar))
+  mutate(hosp_censvar.cr=as.factor(ifelse(hosp_censvar==0 & !is.na(death_date) & death_date==hosp_censdate, 2, hosp_censvar)))
 
-cohort <- cohort %>%
-  mutate(hosp_censvar.cr=ifelse(is.na(hosp_censvar.cr), 0, hosp_censvar.cr))
-
-table(cohort$hosp_censvar.cr)
 describe(cohort$hosp_censvar.cr)
-## 3.3% getting outcome, 1.4% dying of other causes
-
-
-cohort <- cohort %>%
-  mutate(hosp_censvar.cr=as.factor(hosp_censvar.cr))
-
-
-# Plot cumulative incidence adjusted for competing risk of death
-cuminc(Surv(hosp_censtime_yrs, hosp_censvar.cr) ~ studydrug, data = cohort) %>% 
-  ggcuminc() + 
-  labs(
-    x = "Years"
-  ) + 
-  add_confidence_interval() +
-  add_risktable()
-
-
-# Just look at over 70s and compare to survival without competing risk
-agecut <- 70
-ggsurvplot(survfit(Surv(hosp_censtime_yrs, hosp_censvar) ~ studydrug, data = cohort, subset=dstartdate_age>agecut),fun = function(x) {100 - x*100})
-
-cohort.agecut <- cohort %>% 
-  filter(dstartdate_age>agecut)
-
-cuminc(Surv(hosp_censtime_yrs, hosp_censvar.cr) ~ studydrug, data = cohort.agecut) %>% 
-  ggcuminc() + 
-  labs(
-    x = "Years"
-  ) + 
-  add_confidence_interval() +
-  add_risktable()
-
+## 18.7% getting outcome, 0.5% dying of other causes
+table(cohort$studydrug, cohort$hosp_censvar.cr)
+prop.table(table(cohort$studydrug, cohort$hosp_censvar.cr), margin=1)
 
 
 # Adjusted 'hazard ratios'
@@ -896,11 +823,11 @@ cuminc(Surv(hosp_censtime_yrs, hosp_censvar.cr) ~ studydrug, data = cohort.agecu
 crr(Surv(hosp_censtime_yrs, hosp_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tbl_regression(exp = TRUE)
 
-##SGLT2	0.76	0.68, 0.85	<0.001
+##SGLT2	0.87	0.84, 0.90	<0.001
 
 # coxph comparison
 coxph(Surv(hosp_censtime_yrs, hosp_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tidy(conf.int = TRUE, exponentiate = TRUE) %>% 
   select(term, estimate, starts_with("conf"))
 
-## studydrugSGLT2           0.759    0.680     0.848
+## studydrugSGLT2           0.87    0.84    0.90
