@@ -33,8 +33,8 @@ rm(list=ls())
 ## A Cohort selection (see cohort_definition function for details)
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Raw data/")
-load("20230116_t2d_1stinstance.Rda")
-load("20230116_t2d_all_drug_periods.Rda")
+load("20230213_t2d_1stinstance.Rda")
+load("20230213_t2d_all_drug_periods.Rda")
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Scripts/Functions")
 source("cohort_definition.R")
@@ -44,17 +44,13 @@ cohort <- define_cohort(t2d_1stinstance, t2d_all_drug_periods)
 cohort <- cohort %>% filter(studydrug!="GLP1")
 
 table(cohort$studydrug)
-# DPP4SU 90848
-# SGLT2 48280
+# DPP4SU 91492
+# SGLT2 48562
 
 
 ## B Make variables for survival analysis of all endpoints (see survival_variables function for details)
 
 source("survival_variables.R")
-
-cohort <- cohort %>%
-  mutate(postdrug_first_ischaemic_stroke=postdrug_first_stroke,
-         postdrug_first_unstable_angina=postdrug_first_angina)
 
 cohort <- add_surv_vars(cohort, main_only=TRUE)
          
@@ -63,7 +59,7 @@ cohort <- add_surv_vars(cohort, main_only=TRUE)
 
 cohort <- cohort %>%
   
-  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preckdstage, contains("cens"), qrisk2_5yr_score, last_sglt2_stop)
+  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preegfr, preckdstage, contains("cens"), qrisk2_5yr_score, last_sglt2_stop)
 
 rm(list=setdiff(ls(), "cohort"))
 
@@ -129,5 +125,60 @@ for (i in main_outcomes) {
   all_hrs <- rbind(all_hrs, outcome_hr)
   
 }
+
+
+## Redo egfr_40 outcome to remove people without baseline eGFR
+
+egfr_cohort <- cohort %>%
+  filter(!is.na(preegfr))
+  
+count <- egfr_cohort %>%
+  group_by(studydrug) %>%
+  summarise(count=n()) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_count",
+              values_from=count)
+
+followup <- egfr_cohort %>%
+  group_by(studydrug) %>%
+  summarise(time=round(median(ckd_egfr40_censtime_yrs), 2)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_followup",
+              values_from=time)
+  
+events <- egfr_cohort %>%
+  group_by(studydrug) %>%
+  summarise(event_count=sum(ckd_egfr40_censvar),
+            drug_count=n()) %>%
+  mutate(events_perc=round(event_count*100/drug_count, 1),
+         events=paste0(event_count, " (", events_perc, "%)")) %>%
+  select(studydrug, events) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_events",
+              values_from=events)
+  
+  
+f <- as.formula("Surv(ckd_egfr40_censtime_yrs, ckd_egfr40_censvar) ~  studydrug")
+
+unadjusted <- coxph(f, egfr_cohort) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  mutate(unadjusted_HR=paste0(round(estimate, 2), " (", round(conf.low, 2), ", ", round(conf.high, 2), ")")) %>%
+  select(unadjusted_HR)
+
+f_adjusted <- as.formula("Surv(ckd_egfr40_censtime_yrs, ckd_egfr40_censvar) ~  studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx")
+
+adjusted <- coxph(f_adjusted, egfr_cohort) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  mutate(adjusted_HR=paste0(round(estimate, 2), " (", round(conf.low, 2), ", ", round(conf.high, 2), ")")) %>%
+  select(adjusted_HR)
+
+
+outcome_hr <- cbind(outcome="ckd_egfr40", count, followup, events, unadjusted, adjusted)
+  
+all_hrs <- rbind(all_hrs, outcome_hr)
+
+
 
 flextable(all_hrs)

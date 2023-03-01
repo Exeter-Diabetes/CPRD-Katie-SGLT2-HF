@@ -10,12 +10,13 @@
 ## g) Initiated between 01/01/2013 and end of data (31/10/2020)
 ## h) Exclude if first line
 ## i) Exclude if also on insulin/GLP1 (except GLP1 arm)/SGLT2 (except SGLT2 arm)/TZD
-## j) No CVD (NICE definition: angina, IHD, MI, PAD, revasc, stroke) or HF before index date
-## k) Exclude if CKD (stage 3a-5) before index date
-## l) Exclude if missing QRISK2 or QDHF
+## j) No CVD (broad definition: angina, IHD, MI, PAD, revasc, stroke, TIA (as per NICE but with TIA))
+## k) No HF before index date
+## l) No CKD (stage 3a-5) before index date (assume coded on all, so if missing assume negative)
+## m) Exclude if missing QRISK2 or QDHF
 ### NB: this includes if any required variables missing (smoking status, baseline HbA1c) or if values out of range (age<25 or >84, cholHDL<1 or >11, HbA1c<40 or >150, SBP<70 or >210, BMI<20 - QDHF has not been calculated in these cases))
 ### will also exclude anyone without QRISK2 score (missing if missing smoking status or age/cholHDL/SBP/BMI outside of range [weirdly cholHDL range for QRISK2 is 1-12 vs 1-11 for QDHF])
-## m) Exclude if no IMD - as adjusting for this
+## n) Exclude if no IMD - as adjusting for this
   
 
 # Use "t2d_1stinstance" cohort_dataset which already has a)-d) applied
@@ -44,23 +45,28 @@ define_cohort <- function(cohort_dataset, all_drug_periods_dataset) {
     filter((drugclass=="GLP1" | GLP1==0) & TZD==0 & (drugclass=="SGLT2" | SGLT2==0))
 
   
-  # Remove if CVD or HF before index date (j above)
+  # Remove if CVD before index date (j above)
   cohort <- cohort %>%
-    mutate(predrug_cvd=ifelse(predrug_angina==1 | predrug_ihd==1 | predrug_myocardialinfarction==1 | predrug_pad==1 | predrug_revasc==1 | predrug_stroke==1, 1, 0)) %>%
-    filter(predrug_cvd==0 & predrug_heartfailure==0)
+    mutate(predrug_cvd=ifelse(predrug_angina==1 | predrug_ihd==1 | predrug_myocardialinfarction==1 | predrug_pad==1 | predrug_revasc==1 | predrug_stroke==1 | predrug_tia==1, 1, 0)) %>%
+    filter(predrug_cvd==0)
+  
+  
+  # Remove if HF before index date (k above)
+  cohort <- cohort %>%
+    mutate(predrug_heartfailure==0)
   
 
-  # Remove if CKD before index date (k above)
+  # Remove if CKD before index date (l above)
   cohort <- cohort %>%
     filter(is.na(preckdstage) | (preckdstage!="stage_3a" & preckdstage!="stage_3b" & preckdstage!="stage_4" & preckdstage!="stage_5"))
 
   
-  # Remove if don't have QDHF variables (l above; also removes those without QRISK2)
+  # Remove if don't have QDHF variables (m above; also removes those without QRISK2)
   cohort <- cohort %>%
     filter(!is.na(qdiabeteshf_5yr_score))
   
   
-  # Remove if don't have IMD (m above)
+  # Remove if don't have IMD (n above)
   cohort <- cohort %>%
     filter(!is.na(imd2015_10))
   

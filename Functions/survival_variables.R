@@ -3,8 +3,8 @@
 ## All censored at 5 years post drug start / end of GP records / death / starting a different diabetes med which affects CV risk (TZD/GLP1/SGLT2), and also drug stop date + 6 months for per-protocol analysis
 
 # Main analysis:
-## 'mace': ischaemic stroke, MI, CV death
-## 'expanded_mace': ischaemic stroke, MI, CV death, revasc, HES unstable angina
+## 'mace': stroke, MI, CV death
+## 'expanded_mace': stroke, MI, CV death, revasc, HES unstable angina
 ## 'hf'
 ## 'ckd_345': onset of CKD stage 3a-5
 ## 'ckd_egfr40': fall in eGFR of <=40% from baseline or onset of CKD stage 5
@@ -42,15 +42,15 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
                         na.rm=TRUE),
            
            mace_outcome=pmin(postdrug_first_myocardialinfarction,
-                             postdrug_first_ischaemic_stroke,
+                             postdrug_first_stroke,
                              cv_death_date_any_cause,
                              na.rm=TRUE),
           
            expanded_mace_outcome=pmin(postdrug_first_myocardialinfarction,
-                                      postdrug_first_ischaemic_stroke,
+                                      postdrug_first_stroke,
                                       cv_death_date_any_cause,
                                       postdrug_first_revasc,
-                                      postdrug_first_unstable_angina,
+                                      postdrug_first_unstableangina,
                                       na.rm=TRUE),
              
            hf_outcome=pmin(postdrug_first_heartfailure,

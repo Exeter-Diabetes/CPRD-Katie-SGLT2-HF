@@ -1,5 +1,5 @@
 
-# HRs for SGLT2 vs DPP4SU for MACE, HF, CKD, outcomes, hospitalisation, mortality
+# HRs for SGLT2 vs DPP4SU for MACE, expanded MACE, HF, CKD, outcomes, hospitalisation, mortality
 
 # Unadjusted and adjusted for age + sex + duration + IMD + QRisk(5yr) + drugline + ncurrtx (adding ethnicity makes ~no difference)
 
@@ -34,8 +34,8 @@ rm(list=ls())
 ## A Cohort selection (see cohort_definition function for details)
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Raw data/")
-load("20230116_t2d_1stinstance.Rda")
-load("20230116_t2d_all_drug_periods.Rda")
+load("20230213_t2d_1stinstance.Rda")
+load("20230213_t2d_all_drug_periods.Rda")
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Scripts/Functions")
 source("cohort_definition.R")
@@ -45,17 +45,13 @@ cohort <- define_cohort(t2d_1stinstance, t2d_all_drug_periods)
 cohort <- cohort %>% filter(studydrug!="GLP1")
 
 table(cohort$studydrug)
-# DPP4SU 90848
-# SGLT2 48280
+# DPP4SU 91492
+# SGLT2 48562
 
 
 ## B Make variables for survival analysis of all endpoints (see survival_variables function for details)
 
 source("survival_variables.R")
-
-cohort <- cohort %>%
-  mutate(postdrug_first_ischaemic_stroke=postdrug_first_stroke,
-         postdrug_first_unstable_angina=postdrug_first_angina)
 
 cohort <- add_surv_vars(cohort)
 
@@ -64,7 +60,7 @@ cohort <- add_surv_vars(cohort)
 
 cohort <- cohort %>%
   
-  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preckdstage, contains("cens"), qrisk2_5yr_score, last_sglt2_stop)
+  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preegfr,  preckdstage, contains("cens"), qrisk2_5yr_score, last_sglt2_stop)
 
 rm(list=setdiff(ls(), "cohort"))
 
@@ -84,14 +80,14 @@ unique_patid_cohort <- cohort %>%
   mutate(earliest_drug_start=min(dstartdate, na.rm=TRUE)) %>%
   ungroup() %>%
   filter(dstartdate==earliest_drug_start)
-#118,585
+#119,411
 
 unique_patid_cohort %>% distinct(patid) %>% count()
-#118,585
+#119,411
 
 table(unique_patid_cohort$studydrug)
-#SGLT2: 29,671
-#DPP4SU: 88,914
+#SGLT2: 29,870
+#DPP4SU: 89,541
 
 
 
@@ -103,8 +99,8 @@ one_year_reg_cohort <- cohort %>%
   filter(reg_before_drug_start>=365 & (is.na(last_sglt2_stop) | last_sglt2_stop>=365))
 
 table(one_year_reg_cohort$studydrug)
-#SGLT2: 47,127
-#DPP4SU: 87,209
+#SGLT2: 47,408
+#DPP4SU: 87,853
 
 
 ############################################################################################
@@ -173,15 +169,84 @@ for (i in outcomes) {
   
 }
 
+
+## Redo egfr_40 outcome to remove people without baseline eGFR
+
+egfr_40_outcomes <- c("ckd_egfr40", "ckd_egfr40_pp")
+
+egfr_cohort <- cohort %>% filter(!is.na(preegfr))
+unique_patid_egfr_cohort <- unique_patid_cohort %>% filter(!is.na(preegfr))
+one_year_reg_egfr_cohort <- one_year_reg_cohort %>% filter(!is.na(preegfr))
+
+egfr_40_cohorts <- c("egfr_cohort", "unique_patid_egfr_cohort", "one_year_reg_egfr_cohort")
+
+for (i in egfr_40_outcomes) {
+  
+  censvar_var=paste0(i, "_censvar")
+  censtime_var=paste0(i, "_censtime_yrs")
+  
+  for (j in egfr_40_cohorts) {
+    
+    count <- get(j) %>%
+      group_by(studydrug) %>%
+      summarise(count=n()) %>%
+      pivot_wider(names_from=studydrug,
+                  names_glue="{studydrug}_count",
+                  values_from=count)
+    
+    followup <- get(j) %>%
+      group_by(studydrug) %>%
+      summarise(time=round(median(!!sym(censtime_var)), 2)) %>%
+      pivot_wider(names_from=studydrug,
+                  names_glue="{studydrug}_followup",
+                  values_from=time)
+    
+    events <- get(j) %>%
+      group_by(studydrug) %>%
+      summarise(event_count=sum(!!sym(censvar_var)),
+                drug_count=n()) %>%
+      mutate(events_perc=round(event_count*100/drug_count, 1),
+             events=paste0(event_count, " (", events_perc, "%)")) %>%
+      select(studydrug, events) %>%
+      pivot_wider(names_from=studydrug,
+                  names_glue="{studydrug}_events",
+                  values_from=events)
+    
+    f <- as.formula(paste("Surv(", censtime_var, ", ", censvar_var, ") ~  studydrug"))
+    
+    unadjusted <- coxph(f, get(j)) %>%
+      tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+      filter(term=="studydrugSGLT2") %>%
+      mutate(unadjusted_HR=paste0(round(estimate, 2), " (", round(conf.low, 2), ", ", round(conf.high, 2), ")")) %>%
+      select(unadjusted_HR)
+    
+    f_adjusted <- as.formula(paste("Surv(", censtime_var, ", ", censvar_var, ") ~  studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx"))
+    
+    adjusted <- coxph(f_adjusted, get(j)) %>%
+      tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+      filter(term=="studydrugSGLT2") %>%
+      mutate(adjusted_HR=paste0(round(estimate, 2), " (", round(conf.low, 2), ", ", round(conf.high, 2), ")")) %>%
+      select(adjusted_HR)
+    
+    outcome_hr <- cbind(outcome=i, cohort=j, count, followup, events, unadjusted, adjusted)
+    
+    all_hrs <- rbind(all_hrs, outcome_hr)
+    
+  }
+  
+}
+
+## Remove ones we won't include
 all_hrs <- all_hrs %>%
-  filter(!((grepl("narrow", outcome) | grepl("pp", outcome)) & cohort!="cohort"))
+  filter(!((grepl("narrow", outcome) | grepl("pp", outcome)) & (cohort!="cohort" & cohort!="egfr_cohort")))
+
 
 flextable(all_hrs)
 
 
 ############################################################################################
 
-# 3 Death as competing risk for MACE, HF and hospitalisation
+# 3 Death as competing risk for MACE, HF, CKD and hospitalisation
 
 library(tidycmprsk)
 library(rms)
@@ -348,6 +413,33 @@ crr(Surv(ckd_egfr40_censtime_yrs, ckd_egfr40_censvar.cr) ~ studydrug, data = coh
 crr(Surv(ckd_egfr40_censtime_yrs, ckd_egfr40_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = cohort) %>% 
   tbl_regression(exp = TRUE)
 ##SGLT2	0.51	0.42, 0.64	<0.001
+
+
+## Redo egfr_40 outcome to remove people without baseline eGFR
+
+# Add death as a competing risk
+## New variable = 0 if censored for other reasons than death, 1 if outcome, 2 if death
+egfr_cohort <- egfr_cohort %>% 
+  mutate(ckd_egfr40_censvar.cr=as.factor(ifelse(ckd_egfr40_censvar==0 & !is.na(death_date) & death_date==ckd_egfr40_censdate, 2, ckd_egfr40_censvar)))
+
+describe(egfr_cohort$ckd_egfr40_censvar.cr)
+## 0.6% getting outcome, 2.4% death
+table(egfr_cohort$studydrug, egfr_cohort$ckd_egfr40_censvar.cr)
+prop.table(table(egfr_cohort$studydrug, egfr_cohort$ckd_egfr40_censvar.cr), margin=1)
+
+
+# 'Hazard ratios'for whole cohort from competing risk regression
+
+# Unadjusted
+crr(Surv(ckd_egfr40_censtime_yrs, ckd_egfr40_censvar.cr) ~ studydrug, data = egfr_cohort) %>% 
+  tbl_regression(exp = TRUE)
+##SGLT2	0.50	0.42, 0.60	<0.001
+
+# Adjusted
+crr(Surv(ckd_egfr40_censtime_yrs, ckd_egfr40_censvar.cr) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + qrisk2_5yr_score + drugline_all + ncurrtx, data = egfr_cohort) %>% 
+  tbl_regression(exp = TRUE)
+##SGLT2	0.49	0.40, 0.60	<0.001
+
 
 
 
