@@ -34,8 +34,8 @@ rm(list=ls())
 ## A Cohort selection (see cohort_definition function for details)
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Raw data/")
-load("20230213_t2d_1stinstance.Rda")
-load("20230213_t2d_all_drug_periods.Rda")
+load("20230308_t2d_1stinstance.Rda")
+load("20230308_t2d_all_drug_periods.Rda")
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Scripts/Functions")
 source("cohort_definition.R")

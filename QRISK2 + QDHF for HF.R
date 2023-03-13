@@ -1,19 +1,17 @@
 
-# Exploring QRISK2 for predicting MACE incidence
+# Exploring QRISK2 and QDiabetes-Heart Failure (QDHF) for predicting heart failure (HF) incidence
 
-## 1 Uncalibrated 5-year QRISK2 vs MACE incidence in both arms (report C-stat + number of events)
+## 1 Uncalibrated 5-year risk scores vs HF incidence in both arms (report C-stat + number of events)
 
-## 2 As per 1, but individual components of MACE
+## 2 (Uncalibrated) 5-year QRISK2 / QDHF vs hazard ratio for HF (is HR constant by baseline QRISK2/QDHF? Report ANOVA)
 
-## 3 (Uncalibrated) 5-year QRISK2 vs hazard ratio for MACE (is HR constant by baseline QRISK2? Report ANOVA)
-
-## 4 Calibrate 5-year QRISK2 on 20% sample of control arm (DPP4SU) - report C-stat before and after and plot
+## 3 Calibrate 5-year risk scores on 20% sample of control arm (DPP4SU) - report C-stat before and after and plot
 ## Recalculate 5-year QRISK2 for control and study arm (report C-stat before and after and plot)
 
-## 5 Plot unadjusted predicted benefit vs actual benefit by benefit decile/categories
+## 4 Plot unadjusted predicted benefit vs actual benefit by benefit decile/categories
 ## Plot adjusted version of above (adjust for...)
 
-### 6 Number needed to treat per benefit decile/category for predicted and actual benefit
+### 5 Number needed to treat per benefit decile/category for predicted and actual benefit
 
 # Not including GLP1 for now
 
@@ -23,13 +21,13 @@
 # Setup
 library(tidyverse)
 #library(gtsummary)
-library(survival)
-library(survminer)
-library(broom)
+#library(survival)
+#library(survminer)
+#library(broom)
 #library(gridExtra)
-library(patchwork)
-library(rms)
-library(cowplot)
+#library(patchwork)
+#library(rms)
+#library(cowplot)
 #library(reshape)
 
 options(dplyr.summarise.inform = FALSE)
@@ -44,8 +42,8 @@ rm(list=ls())
 ## A Cohort selection (see cohort_definition function for details)
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Raw data/")
-load("20230308_t2d_1stinstance.Rda")
-load("20230308_t2d_all_drug_periods.Rda")
+load("20230213_t2d_1stinstance.Rda")
+load("20230213_t2d_all_drug_periods.Rda")
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Scripts/Functions")
 source("cohort_definition.R")
@@ -55,8 +53,8 @@ cohort <- define_cohort(t2d_1stinstance, t2d_all_drug_periods)
 cohort <- cohort %>% filter(studydrug!="GLP1")
 
 table(cohort$studydrug)
-# DPP4SU 95362
-# SGLT2 50234
+# DPP4SU 91492
+# SGLT2 48562
 
 
 ## B Make variables for survival analysis of all endpoints (see survival_variables function for details)
@@ -70,7 +68,7 @@ cohort <- add_surv_vars(cohort, main_only=TRUE)
 
 cohort <- cohort %>%
   
-  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preegfr, preckdstage, qrisk2_smoking_cat, contains("cens"), qrisk2_lin_predictor, qrisk2_5yr_score, qdiabeteshf_lin_predictor, qdiabeteshf_5yr_score, starts_with("ckdpc"), last_sglt2_stop, contains("statins"))
+  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preegfr, preckdstage, qrisk2_smoking_cat, contains("cens"), qrisk2_lin_predictor, qrisk2_5yr_score, qdiabeteshf_lin_predictor, qdiabeteshf_5yr_score, last_sglt2_stop, contains("statins"))
 
 rm(list=setdiff(ls(), "cohort"))
 
@@ -534,188 +532,188 @@ p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 
 ############################################################################################
 
-# 3 Is HR constant with baseline QRISK2?
-ddist <- datadist(cohort); options(datadist='ddist')
-
-
-# Unadjusted (QRISK2 5 year score only)
-
-m2 <- cph(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug*rcs(qrisk2_5yr_score,5), data = cohort,x=T,y=T)
-anova(m2)
-
-describe(cohort$qrisk2_5yr_score)
-quantile(cohort$qrisk2_5yr_score, c(.01, .99), na.rm=TRUE)
-c1 <- quantile(cohort$qrisk2_5yr_score, .01, na.rm=TRUE)
-c99 <- quantile(cohort$qrisk2_5yr_score, .99, na.rm=TRUE)
-
-contrast_spline.1 <- contrast(m2,list(studydrug = "SGLT2", qrisk2_5yr_score = seq(c1,c99,by=0.05)),list(studydrug = "DPP4SU", qrisk2_5yr_score = seq(c1,c99,by=0.05)))
-# save the contrast calculations in a dataframe
-contrast_spline_df <- as.data.frame(contrast_spline.1[c('qrisk2_5yr_score','Contrast','Lower','Upper')])
-
-#plot and save
-contrast_spline_plot_1 <- ggplot(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) +
-  geom_line(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) +
-  xlab(expression(paste("QRISK2 5 yr score"))) +
-  ylab("HR") +
-  scale_x_continuous(breaks = seq(0,50,5)) +
-  #scale_y_continuous(breaks = seq(0.8,1.6,0.1), limits = c(0.8,1.6)) +
-  geom_ribbon(data=contrast_spline_df,aes(x=qrisk2_5yr_score,ymin=exp(Lower),ymax=exp(Upper)),alpha=0.5) +
-  geom_hline(yintercept = 1, linetype = "dashed")  +
-  geom_hline(yintercept = 0.94, linetype = "twodash", color="red", size=1)  +
-  geom_hline(yintercept = 0.83, linetype = "twodash", color="red")  +
-  geom_hline(yintercept = 1.07, linetype = "twodash", color="red")  +
-  theme(legend.position=c(0.8, 0.1)) +
-  theme(legend.title = element_blank()) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.line = element_line(colour =  "grey50" ),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_blank()) +
-  theme(legend.text = element_text(colour="black", size=rel(1))) +
-  ggtitle("")
-
-# define a marginal histogram
-marginal_distribution <- function(x,var) {
-  ggplot(x, aes_string(x = var)) +
-    geom_histogram(bins = 64, alpha = 0.4, position = "identity") +
-    guides(fill = FALSE) +
-    #theme_void() +
-    theme(legend.title = element_blank(), panel.background = element_rect( fill = "white",color = "grey50")) +
-    scale_x_continuous(breaks = seq(0,50,5)) +
-    xlab(expression(paste("QRISK2 5 yr score"))) +
-    #theme(plot.margin = margin()) +
-    theme(text = element_text(size = 14),
-          axis.ticks.y = element_blank(),
-          axis.text.y = element_blank(),
-          axis.title.y = element_blank()) +
-    theme(axis.ticks.y = element_blank(),
-          axis.text.y = element_blank(),
-          axis.title.y = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.border = element_blank(),
-          panel.background = element_blank(),
-          axis.line.x = element_line(color="grey50"))
-
-}
-
-
-hist.dta <- cohort %>% filter(qrisk2_5yr_score>=c1 &  qrisk2_5yr_score <= c99)
-hist.dta$dummy <- 1
-x_hist <- marginal_distribution(hist.dta, "qrisk2_5yr_score")
-
-
-# Arranging the plot using cowplot
-plot_grid(contrast_spline_plot_1, x_hist, ncol = 1,align = 'hv',
-          rel_heights = c(1,0.4), rel_widths = c(1,1))
-
-
-
-
-# Plot with 'deciles' of QRISK2 shown
-#plot and save
-ggplot(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) +
-  geom_line(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) +
-  xlab(expression(paste("QRISK2 5 yr score"))) +
-  ylab("HR") +
-  scale_x_continuous(breaks = seq(0,50,5)) +
-  #scale_y_continuous(breaks = seq(0.8,1.6,0.1), limits = c(0.8,1.6)) +
-  geom_ribbon(data=contrast_spline_df,aes(x=qrisk2_5yr_score,ymin=exp(Lower),ymax=exp(Upper)),alpha=0.5) +
-  geom_hline(yintercept = 1, linetype = "dashed")  +
-  geom_hline(yintercept = 0.94, linetype = "twodash", color="red", size=1)  +
-  geom_hline(yintercept = 0.83, linetype = "twodash", color="red")  +
-  geom_hline(yintercept = 1.07, linetype = "twodash", color="red")  +
-  geom_vline(xintercept = 3, size=1, colour="grey80")  +
-  geom_vline(xintercept = 5, size=1, colour="grey80")  +
-  geom_vline(xintercept = 6.5, size=1, colour="grey80")  +
-  geom_vline(xintercept = 8, size=1, colour="grey80")  +
-  geom_vline(xintercept = 9.5, size=1, colour="grey80")  +
-  geom_vline(xintercept = 11.5, size=1, colour="grey80")  +
-  geom_vline(xintercept = 13.5, size=1, colour="grey80")  +
-  geom_vline(xintercept = 16, size=1, colour="grey80")  +
-  geom_vline(xintercept = 20, size=1, colour="grey80")  +
-  theme(legend.position=c(0.8, 0.1)) +
-  theme(legend.title = element_blank()) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.line = element_line(colour =  "grey50" ),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_blank()) +
-  theme(legend.text = element_text(colour="black", size=rel(1))) +
-  ggtitle("")
-
-
-
-# Adjusted plot
-m3 <- cph(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug*rcs(qrisk2_5yr_score,5) + dstartdate_age  + malesex + dstartdate_dm_dur_all + imd2015_10 + drugline_all + ncurrtx,
-          data = cohort,x=T,y=T)
-anova(m3)
-#no interaction
-
-new_contrast_spline.1 <- contrast(m3,list(studydrug = "SGLT2", qrisk2_5yr_score = seq(c1,c99,by=0.05)),list(studydrug = "DPP4SU", qrisk2_5yr_score = seq(c1,c99,by=0.05)))
-# save the contrast calculations in a dataframe
-new_contrast_spline_df <- as.data.frame(new_contrast_spline.1[c('qrisk2_5yr_score','Contrast','Lower','Upper')])
-
-#plot and save
-contrast_spline_plot_1 <- ggplot(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) +
-  geom_line(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) +
-  xlab(expression(paste("QRISK2 5 yr score"))) +
-  ylab("HR") +
-  scale_x_continuous(breaks = seq(0,50,5)) +
-  #scale_y_continuous(breaks = seq(0.8,1.6,0.1), limits = c(0.8,1.6)) +
-  geom_ribbon(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score,ymin=exp(Lower),ymax=exp(Upper)),alpha=0.5) +
-  geom_hline(yintercept = 1, linetype = "dashed")  +
-  geom_hline(yintercept = 0.94, linetype = "twodash", color="red", size=1)  +
-  geom_hline(yintercept = 0.83, linetype = "twodash", color="red")  +
-  geom_hline(yintercept = 1.07, linetype = "twodash", color="red")  +
-  theme(legend.position=c(0.8, 0.1)) +
-  theme(legend.title = element_blank()) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.line = element_line(colour =  "grey50" ),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_blank()) +
-  theme(legend.text = element_text(colour="black", size=rel(1))) +
-  ggtitle("")
-
-plot_grid(contrast_spline_plot_1, x_hist, ncol = 1,align = 'hv',
-          rel_heights = c(1,0.4), rel_widths = c(1,1))
-
-
-
-
-## Statins at baseline - in last 91 days
-cohort <- cohort %>%
-  mutate(baseline_statins=ifelse(!is.na(predrug_latest_statins) & dstartdate-predrug_latest_statins<=91, 1, 0))
-
-cohort %>%
-  group_by(qrisk2_cat, studydrug) %>%
-  summarise(total=n(),
-            baseline_statins_count=sum(baseline_statins, na.rm=TRUE)) %>%
-  mutate(baseline_statins_perc=round(baseline_statins_count*100/total, 0))
-
-
-
-## Statins in followup
-cohort <- cohort %>%
-  mutate(statins_in_followup=ifelse(!is.na(postdrug_first_statins) & postdrug_first_statins<mace_censdate, 1, 0))
-
-cohort %>%
-  group_by(qrisk2_cat, studydrug) %>%
-  summarise(total=n(),
-            statins_in_followup_count=sum(statins_in_followup, na.rm=TRUE)) %>%
-  mutate(statins_in_followup_perc=round(statins_in_followup_count*100/total, 0))
-
-
-
-## HbA1c
-cohort %>% group_by(qrisk2_cat, studydrug) %>% summarise(hba1c=median(prehba1c, na.rm=TRUE))
+# # 3 Is HR constant with baseline QRISK2?
+# ddist <- datadist(cohort); options(datadist='ddist')
+# 
+# 
+# # Unadjusted (QRISK2 5 year score only)
+# 
+# m2 <- cph(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug*rcs(qrisk2_5yr_score,5), data = cohort,x=T,y=T)
+# anova(m2)
+# 
+# describe(cohort$qrisk2_5yr_score)
+# quantile(cohort$qrisk2_5yr_score, c(.01, .99), na.rm=TRUE)
+# c1 <- quantile(cohort$qrisk2_5yr_score, .01, na.rm=TRUE)
+# c99 <- quantile(cohort$qrisk2_5yr_score, .99, na.rm=TRUE)
+# 
+# contrast_spline.1 <- contrast(m2,list(studydrug = "SGLT2", qrisk2_5yr_score = seq(c1,c99,by=0.05)),list(studydrug = "DPP4SU", qrisk2_5yr_score = seq(c1,c99,by=0.05)))
+# # save the contrast calculations in a dataframe
+# contrast_spline_df <- as.data.frame(contrast_spline.1[c('qrisk2_5yr_score','Contrast','Lower','Upper')])
+# 
+# #plot and save
+# contrast_spline_plot_1 <- ggplot(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) + 
+#   geom_line(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) + 
+#   xlab(expression(paste("QRISK2 5 yr score"))) + 
+#   ylab("HR") +
+#   scale_x_continuous(breaks = seq(0,50,5)) +
+#   #scale_y_continuous(breaks = seq(0.8,1.6,0.1), limits = c(0.8,1.6)) +
+#   geom_ribbon(data=contrast_spline_df,aes(x=qrisk2_5yr_score,ymin=exp(Lower),ymax=exp(Upper)),alpha=0.5) +
+#   geom_hline(yintercept = 1, linetype = "dashed")  +
+#   geom_hline(yintercept = 0.94, linetype = "twodash", color="red", size=1)  +
+#   geom_hline(yintercept = 0.83, linetype = "twodash", color="red")  +
+#   geom_hline(yintercept = 1.07, linetype = "twodash", color="red")  +
+#   theme(legend.position=c(0.8, 0.1)) +
+#   theme(legend.title = element_blank()) +  
+#   theme_bw() +
+#   theme(text = element_text(size = 14),
+#         axis.line = element_line(colour =  "grey50" ),
+#         panel.grid.major = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         panel.border = element_blank(), 
+#         panel.background = element_blank()) +
+#   theme(legend.text = element_text(colour="black", size=rel(1))) +
+#   ggtitle("")
+# 
+# # define a marginal histogram
+# marginal_distribution <- function(x,var) {
+#   ggplot(x, aes_string(x = var)) +
+#     geom_histogram(bins = 64, alpha = 0.4, position = "identity") +
+#     guides(fill = FALSE) +
+#     #theme_void() +
+#     theme(legend.title = element_blank(), panel.background = element_rect( fill = "white",color = "grey50")) +  
+#     scale_x_continuous(breaks = seq(0,50,5)) +
+#     xlab(expression(paste("QRISK2 5 yr score"))) + 
+#     #theme(plot.margin = margin()) +
+#     theme(text = element_text(size = 14),
+#           axis.ticks.y = element_blank(),
+#           axis.text.y = element_blank(),
+#           axis.title.y = element_blank()) + 
+#     theme(axis.ticks.y = element_blank(),
+#           axis.text.y = element_blank(),
+#           axis.title.y = element_blank(),
+#           panel.grid.major = element_blank(),
+#           panel.grid.minor = element_blank(),
+#           panel.border = element_blank(),
+#           panel.background = element_blank(),
+#           axis.line.x = element_line(color="grey50"))
+#   
+# }
+# 
+# 
+# hist.dta <- cohort %>% filter(qrisk2_5yr_score>=c1 &  qrisk2_5yr_score <= c99)
+# hist.dta$dummy <- 1
+# x_hist <- marginal_distribution(hist.dta, "qrisk2_5yr_score")
+# 
+# 
+# # Arranging the plot using cowplot
+# plot_grid(contrast_spline_plot_1, x_hist, ncol = 1,align = 'hv',
+#           rel_heights = c(1,0.4), rel_widths = c(1,1))
+# 
+# 
+# 
+# 
+# # Plot with 'deciles' of QRISK2 shown
+# #plot and save
+# ggplot(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) + 
+#   geom_line(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) + 
+#   xlab(expression(paste("QRISK2 5 yr score"))) + 
+#   ylab("HR") +
+#   scale_x_continuous(breaks = seq(0,50,5)) +
+#   #scale_y_continuous(breaks = seq(0.8,1.6,0.1), limits = c(0.8,1.6)) +
+#   geom_ribbon(data=contrast_spline_df,aes(x=qrisk2_5yr_score,ymin=exp(Lower),ymax=exp(Upper)),alpha=0.5) +
+#   geom_hline(yintercept = 1, linetype = "dashed")  +
+#   geom_hline(yintercept = 0.94, linetype = "twodash", color="red", size=1)  +
+#   geom_hline(yintercept = 0.83, linetype = "twodash", color="red")  +
+#   geom_hline(yintercept = 1.07, linetype = "twodash", color="red")  +
+#   geom_vline(xintercept = 3, size=1, colour="grey80")  +
+#   geom_vline(xintercept = 5, size=1, colour="grey80")  +
+#   geom_vline(xintercept = 6.5, size=1, colour="grey80")  +
+#   geom_vline(xintercept = 8, size=1, colour="grey80")  +
+#   geom_vline(xintercept = 9.5, size=1, colour="grey80")  +
+#   geom_vline(xintercept = 11.5, size=1, colour="grey80")  +
+#   geom_vline(xintercept = 13.5, size=1, colour="grey80")  +
+#   geom_vline(xintercept = 16, size=1, colour="grey80")  +
+#   geom_vline(xintercept = 20, size=1, colour="grey80")  +
+#   theme(legend.position=c(0.8, 0.1)) +
+#   theme(legend.title = element_blank()) +  
+#   theme_bw() +
+#   theme(text = element_text(size = 14),
+#         axis.line = element_line(colour =  "grey50" ),
+#         panel.grid.major = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         panel.border = element_blank(), 
+#         panel.background = element_blank()) +
+#   theme(legend.text = element_text(colour="black", size=rel(1))) +
+#   ggtitle("")
+# 
+# 
+# 
+# # Adjusted plot
+# m3 <- cph(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug*rcs(qrisk2_5yr_score,5) + dstartdate_age  + malesex + dstartdate_dm_dur_all + imd2015_10 + drugline_all + ncurrtx,
+#           data = cohort,x=T,y=T)
+# anova(m3)
+# #no interaction
+# 
+# new_contrast_spline.1 <- contrast(m3,list(studydrug = "SGLT2", qrisk2_5yr_score = seq(c1,c99,by=0.05)),list(studydrug = "DPP4SU", qrisk2_5yr_score = seq(c1,c99,by=0.05)))
+# # save the contrast calculations in a dataframe
+# new_contrast_spline_df <- as.data.frame(new_contrast_spline.1[c('qrisk2_5yr_score','Contrast','Lower','Upper')])
+# 
+# #plot and save
+# contrast_spline_plot_1 <- ggplot(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) + 
+#   geom_line(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) + 
+#   xlab(expression(paste("QRISK2 5 yr score"))) + 
+#   ylab("HR") +
+#   scale_x_continuous(breaks = seq(0,50,5)) +
+#   #scale_y_continuous(breaks = seq(0.8,1.6,0.1), limits = c(0.8,1.6)) +
+#   geom_ribbon(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score,ymin=exp(Lower),ymax=exp(Upper)),alpha=0.5) +
+#   geom_hline(yintercept = 1, linetype = "dashed")  +
+#   geom_hline(yintercept = 0.94, linetype = "twodash", color="red", size=1)  +
+#   geom_hline(yintercept = 0.83, linetype = "twodash", color="red")  +
+#   geom_hline(yintercept = 1.07, linetype = "twodash", color="red")  +
+#   theme(legend.position=c(0.8, 0.1)) +
+#   theme(legend.title = element_blank()) +  
+#   theme_bw() +
+#   theme(text = element_text(size = 14),
+#         axis.line = element_line(colour =  "grey50" ),
+#         panel.grid.major = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         panel.border = element_blank(), 
+#         panel.background = element_blank()) +
+#   theme(legend.text = element_text(colour="black", size=rel(1))) +
+#   ggtitle("")
+# 
+# plot_grid(contrast_spline_plot_1, x_hist, ncol = 1,align = 'hv',
+#           rel_heights = c(1,0.4), rel_widths = c(1,1))
+# 
+# 
+# 
+# 
+# ## Statins at baseline - in last 91 days
+# cohort <- cohort %>%
+#   mutate(baseline_statins=ifelse(!is.na(predrug_latest_statins) & dstartdate-predrug_latest_statins<=91, 1, 0))
+# 
+# cohort %>%
+#   group_by(qrisk2_cat, studydrug) %>%
+#   summarise(total=n(),
+#             baseline_statins_count=sum(baseline_statins, na.rm=TRUE)) %>%
+#   mutate(baseline_statins_perc=round(baseline_statins_count*100/total, 0))
+# 
+# 
+# 
+# ## Statins in followup
+# cohort <- cohort %>%
+#   mutate(statins_in_followup=ifelse(!is.na(postdrug_first_statins) & postdrug_first_statins<mace_censdate, 1, 0))
+# 
+# cohort %>%
+#   group_by(qrisk2_cat, studydrug) %>%
+#   summarise(total=n(),
+#             statins_in_followup_count=sum(statins_in_followup, na.rm=TRUE)) %>%
+#   mutate(statins_in_followup_perc=round(statins_in_followup_count*100/total, 0))
+# 
+# 
+# 
+# ## HbA1c
+# cohort %>% group_by(qrisk2_cat, studydrug) %>% summarise(hba1c=median(prehba1c, na.rm=TRUE))
 
 
 ############################################################################################
@@ -730,13 +728,13 @@ set.seed(123)
 cal_cohort <- cohort %>%
   filter(studydrug=="DPP4SU") %>%
   slice_sample(prop=0.2)
-#19,072
+#18,298
 
 noncal_cohort <- cohort %>%
   anti_join(cal_cohort, by=c("patid", "dstartdate", "studydrug"))
 table(noncal_cohort$studydrug)
-#SGLT2: 50,234
-#DPP4SU: 76,290
+#SGLT2: 48,562 
+#DPP4SU: 73,194  
 
 
 ## Re-estimate baseline hazard for females
@@ -747,7 +745,7 @@ cal_females <- cal_cohort %>%
 recal_mod <- coxph(Surv(mace_censtime_yrs,mace_censvar)~offset(qrisk2_lin_predictor), data=cal_females)
 female_surv <- summary(survfit(recal_mod),time=5)$surv
 sprintf("%.15f",female_surv)
-# 0.952903576285001
+# 0.949071594633994
 
 
 ## Re-estimate baseline hazard for males
@@ -758,7 +756,7 @@ cal_males <- cal_cohort %>%
 recal_mod <- coxph(Surv(mace_censtime_yrs,mace_censvar)~offset(qrisk2_lin_predictor), data=cal_males)
 male_surv <- summary(survfit(recal_mod),time=5)$surv
 sprintf("%.15f",male_surv)
-# 0.932789954513790
+# 0.939301830375210
 
 
 # ## Recalculate QRISK2 and compare to uncalibrated and observed results in calibration cohort
@@ -1241,7 +1239,6 @@ obs_v_pred
 
 
 ## Adjusted for age, sex, duration, IMD, drugline and ncurrtx
-## Think needs re-doing - make dummy dataset
 model <- cph(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug*sglt2_benefit_decile + dstartdate_age, data=noncal_cohort, x=TRUE, y=TRUE, surv=TRUE)
 
 survival_est <- survest(model, newdata=expand.grid(studydrug=c("SGLT2","DPP4SU"), sglt2_benefit_decile=c(1:10), dstartdate_age=noncal_cohort$dstartdate_age), times=5)
