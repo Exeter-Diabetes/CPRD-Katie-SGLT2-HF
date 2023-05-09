@@ -15,20 +15,16 @@
 
 # Not including GLP1 for now
 
-
 ############################################################################################
 
 # Setup
 library(tidyverse)
-#library(gtsummary)
-#library(survival)
-#library(survminer)
-#library(broom)
-#library(gridExtra)
-#library(patchwork)
-#library(rms)
-#library(cowplot)
-#library(reshape)
+library(survival)
+library(survminer)
+library(broom)
+library(patchwork)
+library(rms)
+library(cowplot)
 
 options(dplyr.summarise.inform = FALSE)
 
@@ -42,8 +38,8 @@ rm(list=ls())
 ## A Cohort selection (see cohort_definition function for details)
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Raw data/")
-load("20230213_t2d_1stinstance.Rda")
-load("20230213_t2d_all_drug_periods.Rda")
+load("20230308_t2d_1stinstance.Rda")
+load("20230308_t2d_all_drug_periods.Rda")
 
 setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2023/1 SGLT2 CVD project/Scripts/Functions")
 source("cohort_definition.R")
@@ -53,8 +49,8 @@ cohort <- define_cohort(t2d_1stinstance, t2d_all_drug_periods)
 cohort <- cohort %>% filter(studydrug!="GLP1")
 
 table(cohort$studydrug)
-# DPP4SU 91492
-# SGLT2 48562
+# DPP4SU 95362
+# SGLT2 50234
 
 
 ## B Make variables for survival analysis of all endpoints (see survival_variables function for details)
@@ -68,16 +64,38 @@ cohort <- add_surv_vars(cohort, main_only=TRUE)
 
 cohort <- cohort %>%
   
-  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preegfr, preckdstage, qrisk2_smoking_cat, contains("cens"), qrisk2_lin_predictor, qrisk2_5yr_score, qdiabeteshf_lin_predictor, qdiabeteshf_5yr_score, last_sglt2_stop, contains("statins"))
+  select(patid, malesex, ethnicity_5cat_decoded, imd2015_10, regstartdate, gp_record_end, death_date, drugclass, studydrug, dstartdate, dstopdate, drugline_all, drugsubstances, ncurrtx, DPP4, GLP1, MFN, SGLT2, SU, TZD, INS, dstartdate_age, dstartdate_dm_dur_all, preweight, prehba1c, prebmi, prehdl, preldl, pretriglyceride, pretotalcholesterol, prealt, presbp, preegfr, preckdstage, qrisk2_smoking_cat, contains("cens"), qrisk2_lin_predictor, qrisk2_5yr_score, qdiabeteshf_lin_predictor, qdiabeteshf_5yr_score, starts_with("ckdpc"), last_sglt2_stop, contains("statins"))
 
 rm(list=setdiff(ls(), "cohort"))
 
 
 ############################################################################################
 
-# 1 How well does uncalibrated QRISK predict 5-year MACE incidence?
+# 1 How well do uncalibrated QRISK2 and QDHF predict 5-year HF incidence?
 
-## Use ~deciles of QRISK2, but convert to actual values
+
+## A Compare QRISK2 and QDHF distributions
+
+scaled_qrisk2 <- data.frame(scale(cohort %>% select(qrisk2_5yr_score)))
+scaled_qdhf <- data.frame(scale(cohort %>% select(qdiabeteshf_5yr_score)))
+
+test <- cbind(scaled_qrisk2, scaled_qdhf) %>%
+  pivot_longer(cols=c(qrisk2_5yr_score, qdiabeteshf_5yr_score))
+
+ggplot(test, aes(x=value, fill=name)) +
+  geom_density(alpha=.3) +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=14),
+        legend.text=element_text(size=14),
+        legend.title=element_text(size=14))
+
+ggplot(cohort, aes(x=qrisk2_5yr_score)) + 
+  geom_point(aes(y=qdiabeteshf_5yr_score))
+
+
+
+## B Use ~QRISK2 deciles - define these
+
 quantile(cohort$qrisk2_5yr_score, probs = seq(.1, .9, by = .1))
 # 3.3, 5, 6.5, 8, 9.6, 11.4, 13.5, 16.2, 20.4
 
@@ -100,14 +118,17 @@ table(cohort$qrisk2_cat, useNA="always")
 
 
 
-# Get mean predicted probabilities for each QRISK2 category by studydrug
+## C Compare predicted and observed results
+
+# Get mean predicted probabilities from QRISK2 and QDHF for each QRISK2 category by studydrug
 predicted <- cohort %>%
   group_by(qrisk2_cat, studydrug) %>%
-  summarise(mean_pred=mean(qrisk2_5yr_score)/100)
+  summarise(mean_qrisk2_pred=mean(qrisk2_5yr_score)/100,
+            mean_qdhf_pred=mean(qdiabeteshf_5yr_score)/100)
 
 
 # Find actual observed probabilities by QRISK2 category and studydrug
-observed_dpp4su <- survfit(Surv(mace_censtime_yrs, mace_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="DPP4SU",]) %>%
+observed_dpp4su <- survfit(Surv(hf_censtime_yrs, hf_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="DPP4SU",]) %>%
   tidy() %>%
   group_by(strata) %>%
   filter(time==max(time)) %>%
@@ -117,11 +138,11 @@ observed_dpp4su <- survfit(Surv(mace_censtime_yrs, mace_censvar) ~ qrisk2_cat, d
   select(observed_dpp4su, lower_ci_dpp4su, upper_ci_dpp4su, strata)
 
 dpp4su_events <- cohort %>%
-  filter(studydrug=="DPP4SU" & mace_censvar==1) %>%
+  filter(studydrug=="DPP4SU" & hf_censvar==1) %>%
   group_by(qrisk2_cat) %>%
   summarise(DPP4SU=n())
 
-observed_sglt2 <- survfit(Surv(mace_censtime_yrs, mace_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="SGLT2",]) %>%
+observed_sglt2 <- survfit(Surv(hf_censtime_yrs, hf_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="SGLT2",]) %>%
   tidy() %>%
   group_by(strata) %>%
   filter(time==max(time)) %>%
@@ -131,7 +152,7 @@ observed_sglt2 <- survfit(Surv(mace_censtime_yrs, mace_censvar) ~ qrisk2_cat, da
   select(observed_sglt2, lower_ci_sglt2, upper_ci_sglt2, strata)
 
 sglt2_events <- cohort %>%
-  filter(studydrug=="SGLT2" & mace_censvar==1) %>%
+  filter(studydrug=="SGLT2" & hf_censvar==1) %>%
   group_by(qrisk2_cat) %>%
   summarise(SGLT2=n())
 
@@ -154,21 +175,22 @@ dodge <- position_dodge(width=0.3)
 
 empty_tick <- obs_v_pred %>%
   filter(qrisk2_cat==1) %>%
-  mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_pred=NA, qrisk2_cat=0)
+  mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_qrisk2_pred=NA, mean_qdhf_pred=NA, qrisk2_cat=0)
 
-p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat, group=studydrug, color=studydrug)) +
-  geom_point(aes(y = mean_pred*100), position=dodge) +
+p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat, group=studydrug, color=studydrug, fill=studydrug)) +
   geom_point(aes(y = observed*100), position=dodge) +
-  geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),alpha=1,width=0.25,size=1, position=dodge) +
+  geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),width=0.25,size=1, position=dodge) +
+  geom_point(aes(y = mean_qrisk2_pred*100), position=dodge, shape=19, size=2) +
+  geom_point(aes(y = mean_qdhf_pred*100), position=dodge, shape=22, size=2, color="black") +
   theme_bw() +
   xlab("QRISK2 category") + ylab("Risk (%)")+
   scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-  scale_y_continuous(breaks=c(seq(0,25,by=5)), limits=c(0,26)) +
+  scale_y_continuous(breaks=c(seq(0,25,by=5)), limits=c(0,27)) +
   theme(panel.border=element_blank(), panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
         axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour="black"),
         plot.title = element_text(size = rel(1.5), face = "bold")) + theme(plot.margin = margin()) +
   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5))) +
-  ggtitle("Uncalibrated QRISK2 vs MACE incidence (5 year)")
+  ggtitle("Uncalibrated QRISK2/QDHF vs HF incidence (5 year)")
 
 p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
 p2$widths <- unit(rep(1, ncol(p2)), "null")
@@ -179,397 +201,71 @@ p3 <- ggplot() +
 
 p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 
+# QRISK2 way overestimates but might expect this as predicting MACE = much more common
+# QDHF looks good
 
-# Way underestimates
 
+## D Look at C-stats
 
-############################################################################################
+cohort <- cohort %>%
+  mutate(qrisk2_survival=(100-qrisk2_5yr_score)/100,
+         qdiabeteshf_survival=(100-qdiabeteshf_5yr_score)/100)
+  
+### QRISK2
+surv_mod <- coxph(Surv(hf_censtime_yrs, hf_censvar)~qrisk2_survival,data=cohort,method="breslow")
+summary(surv_mod)$concordance[1]
+summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
+summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
+# 0.7139811 (0.7044466-0.7235156)
 
-# # 2 Look at contributions of different MACE components
-# 
-# cohort <- cohort %>%
-#   mutate(which_mace=ifelse(!is.na(postdrug_broad_mace) & !is.na(postdrug_first_myocardialinfarction) & !is.na(postdrug_first_stroke) & !is.na(cv_death_date_primary_cause) & postdrug_broad_mace==postdrug_first_myocardialinfarction & postdrug_broad_mace==postdrug_first_stroke & postdrug_broad_mace==cv_death_date_primary_cause, "all three",
-#                            ifelse(!is.na(postdrug_broad_mace) & !is.na(postdrug_first_myocardialinfarction) & !is.na(postdrug_first_stroke) & postdrug_broad_mace==postdrug_first_myocardialinfarction & postdrug_broad_mace==postdrug_first_stroke, "mi & stroke",
-#                                   ifelse(!is.na(postdrug_broad_mace) & !is.na(postdrug_first_myocardialinfarction) & !is.na(cv_death_date_primary_cause) & postdrug_broad_mace==postdrug_first_myocardialinfarction & postdrug_broad_mace==cv_death_date_primary_cause, "mi & death",
-#                                          ifelse(!is.na(postdrug_broad_mace) & !is.na(postdrug_first_stroke) & !is.na(cv_death_date_primary_cause) & postdrug_broad_mace==postdrug_first_stroke & postdrug_broad_mace==cv_death_date_primary_cause, "stroke & death",
-#                                                 ifelse(!is.na(postdrug_broad_mace) & !is.na(postdrug_first_myocardialinfarction) & postdrug_broad_mace==postdrug_first_myocardialinfarction, "mi",
-#                                                        ifelse(!is.na(postdrug_broad_mace) & !is.na(postdrug_first_stroke) & postdrug_broad_mace==postdrug_first_stroke, "stroke",
-#                                                               ifelse(!is.na(postdrug_broad_mace) & !is.na(cv_death_date_primary_cause) & postdrug_broad_mace==cv_death_date_primary_cause, "cv death", NA))))))))
-# 
-# 
-# prop.table(table(cohort$which_mace))
-# # 13% CV death, 44% MI, 42% stroke
-# 
-# prop.table(table(cohort$studydrug, cohort$which_mace), margin=1)
-# # 13% CV death, 44% MI, 42% stroke
-# 
-# 
-# # Make new survival variables; don't censor at postdrug_broad_mace
-# cohort <- cohort %>%
-#   mutate(mi_censdate=if_else(studydrug=="SGLT2",
-#                                      pmin(five_years_post_dstart,
-#                                           death_date,
-#                                           next_glp1_start,
-#                                           next_tzd_start,
-#                                           gp_record_end,
-#                                           postdrug_first_myocardialinfarction, na.rm=TRUE),
-#                                      if_else(studydrug=="DPP4SU",
-#                                              pmin(five_years_post_dstart,
-#                                                   death_date,
-#                                                   next_sglt2_start,
-#                                                   next_glp1_start,
-#                                                   next_tzd_start,
-#                                                   gp_record_end,
-#                                                   postdrug_first_myocardialinfarction, na.rm=TRUE),
-#                                              as.Date(NA))),
-#          
-#          mi_censvar=ifelse(!is.na(postdrug_first_myocardialinfarction) & mi_censdate==postdrug_first_myocardialinfarction, 1, 0),
-#          
-#          mi_censtime_yrs=as.numeric(difftime(mi_censdate, dstartdate, unit="days"))/365.25,
-#          
-#          
-#          cv_death_censdate=if_else(studydrug=="SGLT2",
-#                              pmin(five_years_post_dstart,
-#                                   death_date,
-#                                   next_glp1_start,
-#                                   next_tzd_start,
-#                                   gp_record_end,
-#                                   cv_death_date_any_cause, na.rm=TRUE),
-#                              if_else(studydrug=="DPP4SU",
-#                                      pmin(five_years_post_dstart,
-#                                           death_date,
-#                                           next_sglt2_start,
-#                                           next_glp1_start,
-#                                           next_tzd_start,
-#                                           gp_record_end,
-#                                           cv_death_date_any_cause, na.rm=TRUE),
-#                                      as.Date(NA))),
-#          
-#          cv_death_censvar=ifelse(!is.na(cv_death_date_any_cause) & cv_death_censdate==cv_death_date_any_cause, 1, 0),
-#          
-#          cv_death_censtime_yrs=as.numeric(difftime(cv_death_censdate, dstartdate, unit="days"))/365.25,
-#          
-#          
-#          stroke_censdate=if_else(studydrug=="SGLT2",
-#                              pmin(five_years_post_dstart,
-#                                   death_date,
-#                                   next_glp1_start,
-#                                   next_tzd_start,
-#                                   gp_record_end,
-#                                   postdrug_first_stroke, na.rm=TRUE),
-#                              if_else(studydrug=="DPP4SU",
-#                                      pmin(five_years_post_dstart,
-#                                           death_date,
-#                                           next_sglt2_start,
-#                                           next_glp1_start,
-#                                           next_tzd_start,
-#                                           gp_record_end,
-#                                           postdrug_first_stroke, na.rm=TRUE),
-#                                      as.Date(NA))),
-#          
-#          stroke_censvar=ifelse(!is.na(postdrug_first_stroke) & stroke_censdate==postdrug_first_stroke, 1, 0),
-#          
-#          stroke_censtime_yrs=as.numeric(difftime(stroke_censdate, dstartdate, unit="days"))/365.25)
-# 
-# 
-# # By arm
-# 
-# ## Find actual observed probabilities by QRISK2 category
-# 
-# ### MI
-# 
-# mi_dpp4su <- survfit(Surv(mi_censtime_yrs, mi_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="DPP4SU",]) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed_dpp4su=1-estimate,
-#          lower_ci_dpp4su=1-conf.low,
-#          upper_ci_dpp4su=1-conf.high) %>%
-#   select(observed_dpp4su, lower_ci_dpp4su, upper_ci_dpp4su, strata)
-# 
-# mi_sglt2 <- survfit(Surv(mi_censtime_yrs, mi_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="SGLT2",]) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed_sglt2=1-estimate,
-#          lower_ci_sglt2=1-conf.low,
-#          upper_ci_sglt2=1-conf.high) %>%
-#   select(observed_sglt2, lower_ci_sglt2, upper_ci_sglt2, strata)
-# 
-# obs_v_pred <- rbind(mi_dpp4su, mi_sglt2) %>%
-#   mutate(observed=coalesce(observed_dpp4su, observed_sglt2),
-#          lower_ci=coalesce(lower_ci_dpp4su, lower_ci_sglt2),
-#          upper_ci=coalesce(upper_ci_dpp4su, upper_ci_sglt2),
-#          qrisk2_cat=case_when(
-#            strata=="qrisk2_cat=1" ~ 1,
-#            strata=="qrisk2_cat=2" ~ 2,
-#            strata=="qrisk2_cat=3" ~ 3,
-#            strata=="qrisk2_cat=4" ~ 4,
-#            strata=="qrisk2_cat=5" ~ 5,
-#            strata=="qrisk2_cat=6" ~ 6,
-#            strata=="qrisk2_cat=7" ~ 7,
-#            strata=="qrisk2_cat=8" ~ 8,
-#            strata=="qrisk2_cat=9" ~ 9,
-#            strata=="qrisk2_cat=10" ~ 10
-#          ),
-#          studydrug=ifelse(is.na(observed_sglt2), "DPP4SU", "SGLT2"))
-# 
-# dpp4su_events <- cohort %>%
-#   filter(studydrug=="DPP4SU" & mi_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(DPP4SU=n())
-# 
-# sglt2_events <- cohort %>%
-#   filter(studydrug=="SGLT2" & mi_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(SGLT2=n())
-# 
-# events_table <- data.frame(t(dpp4su_events %>%
-#                                inner_join(sglt2_events))) %>%
-#   rownames_to_column() %>%
-#   filter(rowname!="qrisk2_cat")
-# 
-# 
-# dodge <- position_dodge(width=0.3)
-# 
-# empty_tick <- obs_v_pred %>%
-#   filter(qrisk2_cat==1) %>%
-#   mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_pred=NA, qrisk2_cat=0)
-# 
-# p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat, group=studydrug, color=studydrug)) + 
-#   geom_point(aes(y = mean_pred*100), position=dodge) +
-#   geom_point(aes(y = observed*100), position=dodge) +
-#   geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),alpha=1,width=0.25,size=1, position=dodge) +
-#   theme_bw() +
-#   xlab("QRISK2 category") + ylab("Risk (%)")+
-#   scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-#   scale_y_continuous(breaks=c(seq(0,10,by=2)), limits=c(0,11)) +
-#   theme(panel.border=element_blank(), panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
-#         axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour="black"),
-#         plot.title = element_text(size = rel(1.5), face = "bold")) + theme(plot.margin = margin()) +
-#   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5))) +
-#   ggtitle("MI incidence")
-# 
-# p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
-# p2$widths <- unit(rep(1, ncol(p2)), "null")
-# p2$heights <- unit(rep(1, nrow(p2)), "null")
-# 
-# p3 <- ggplot() +
-#   annotation_custom(p2)
-# 
-# p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
-# 
-# 
-# 
-# ### Stroke
-# 
-# stroke_dpp4su <- survfit(Surv(stroke_censtime_yrs, stroke_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="DPP4SU",]) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed_dpp4su=1-estimate,
-#          lower_ci_dpp4su=1-conf.low,
-#          upper_ci_dpp4su=1-conf.high) %>%
-#   select(observed_dpp4su, lower_ci_dpp4su, upper_ci_dpp4su, strata)
-# 
-# stroke_sglt2 <- survfit(Surv(stroke_censtime_yrs, stroke_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="SGLT2",]) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed_sglt2=1-estimate,
-#          lower_ci_sglt2=1-conf.low,
-#          upper_ci_sglt2=1-conf.high) %>%
-#   select(observed_sglt2, lower_ci_sglt2, upper_ci_sglt2, strata)
-# 
-# obs_v_pred <- rbind(stroke_dpp4su, stroke_sglt2) %>%
-#   mutate(observed=coalesce(observed_dpp4su, observed_sglt2),
-#          lower_ci=coalesce(lower_ci_dpp4su, lower_ci_sglt2),
-#          upper_ci=coalesce(upper_ci_dpp4su, upper_ci_sglt2),
-#          qrisk2_cat=case_when(
-#            strata=="qrisk2_cat=1" ~ 1,
-#            strata=="qrisk2_cat=2" ~ 2,
-#            strata=="qrisk2_cat=3" ~ 3,
-#            strata=="qrisk2_cat=4" ~ 4,
-#            strata=="qrisk2_cat=5" ~ 5,
-#            strata=="qrisk2_cat=6" ~ 6,
-#            strata=="qrisk2_cat=7" ~ 7,
-#            strata=="qrisk2_cat=8" ~ 8,
-#            strata=="qrisk2_cat=9" ~ 9,
-#            strata=="qrisk2_cat=10" ~ 10
-#          ),
-#          studydrug=ifelse(is.na(observed_sglt2), "DPP4SU", "SGLT2"))
-# 
-# dpp4su_events <- cohort %>%
-#   filter(studydrug=="DPP4SU" & stroke_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(DPP4SU=n())
-# 
-# sglt2_events <- cohort %>%
-#   filter(studydrug=="SGLT2" & stroke_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(SGLT2=n())
-# 
-# events_table <- data.frame(t(dpp4su_events %>%
-#                                inner_join(sglt2_events))) %>%
-#   rownames_to_column() %>%
-#   filter(rowname!="qrisk2_cat")
-# 
-# 
-# dodge <- position_dodge(width=0.3)
-# 
-# empty_tick <- obs_v_pred %>%
-#   filter(qrisk2_cat==1) %>%
-#   mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_pred=NA, qrisk2_cat=0)
-# 
-# p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat, group=studydrug, color=studydrug)) + 
-#   geom_point(aes(y = mean_pred*100), position=dodge) +
-#   geom_point(aes(y = observed*100), position=dodge) +
-#   geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),alpha=1,width=0.25,size=1, position=dodge) +
-#   theme_bw() +
-#   xlab("QRISK2 category") + ylab("Risk (%)")+
-#   scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-#   scale_y_continuous(breaks=c(seq(0,10,by=2)), limits=c(0,11)) +
-#   theme(panel.border=element_blank(), panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
-#         axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour="black"),
-#         plot.title = element_text(size = rel(1.5), face = "bold")) + theme(plot.margin = margin()) +
-#   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5))) +
-#   ggtitle("Stroke incidence")
-# 
-# p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
-# p2$widths <- unit(rep(1, ncol(p2)), "null")
-# p2$heights <- unit(rep(1, nrow(p2)), "null")
-# 
-# p3 <- ggplot() +
-#   annotation_custom(p2)
-# 
-# p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
-# 
-# 
-# ### CV death
-# 
-# cv_death_dpp4su <- survfit(Surv(cv_death_censtime_yrs, cv_death_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="DPP4SU",]) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed_dpp4su=1-estimate,
-#          lower_ci_dpp4su=1-conf.low,
-#          upper_ci_dpp4su=1-conf.high) %>%
-#   select(observed_dpp4su, lower_ci_dpp4su, upper_ci_dpp4su, strata)
-# 
-# cv_death_sglt2 <- survfit(Surv(cv_death_censtime_yrs, cv_death_censvar) ~ qrisk2_cat, data=cohort[cohort$studydrug=="SGLT2",]) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed_sglt2=1-estimate,
-#          lower_ci_sglt2=1-conf.low,
-#          upper_ci_sglt2=1-conf.high) %>%
-#   select(observed_sglt2, lower_ci_sglt2, upper_ci_sglt2, strata)
-# 
-# obs_v_pred <- rbind(cv_death_dpp4su, cv_death_sglt2) %>%
-#   mutate(observed=coalesce(observed_dpp4su, observed_sglt2),
-#          lower_ci=coalesce(lower_ci_dpp4su, lower_ci_sglt2),
-#          upper_ci=coalesce(upper_ci_dpp4su, upper_ci_sglt2),
-#          qrisk2_cat=case_when(
-#            strata=="qrisk2_cat=1" ~ 1,
-#            strata=="qrisk2_cat=2" ~ 2,
-#            strata=="qrisk2_cat=3" ~ 3,
-#            strata=="qrisk2_cat=4" ~ 4,
-#            strata=="qrisk2_cat=5" ~ 5,
-#            strata=="qrisk2_cat=6" ~ 6,
-#            strata=="qrisk2_cat=7" ~ 7,
-#            strata=="qrisk2_cat=8" ~ 8,
-#            strata=="qrisk2_cat=9" ~ 9,
-#            strata=="qrisk2_cat=10" ~ 10
-#          ),
-#          studydrug=ifelse(is.na(observed_sglt2), "DPP4SU", "SGLT2"))
-# 
-# dpp4su_events <- cohort %>%
-#   filter(studydrug=="DPP4SU" & cv_death_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(DPP4SU=n())
-# 
-# sglt2_events <- cohort %>%
-#   filter(studydrug=="SGLT2" & cv_death_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(SGLT2=n())
-# 
-# events_table <- data.frame(t(dpp4su_events %>%
-#                                inner_join(sglt2_events))) %>%
-#   rownames_to_column() %>%
-#   filter(rowname!="qrisk2_cat")
-# 
-# 
-# dodge <- position_dodge(width=0.3)
-# 
-# empty_tick <- obs_v_pred %>%
-#   filter(qrisk2_cat==1) %>%
-#   mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_pred=NA, qrisk2_cat=0)
-# 
-# p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat, group=studydrug, color=studydrug)) + 
-#   geom_point(aes(y = mean_pred*100), position=dodge) +
-#   geom_point(aes(y = observed*100), position=dodge) +
-#   geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),alpha=1,width=0.25,size=1, position=dodge) +
-#   theme_bw() +
-#   xlab("QRISK2 category") + ylab("Risk (%)")+
-#   scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-#   scale_y_continuous(breaks=c(seq(0,10,by=2)), limits=c(0,11)) +
-#   theme(panel.border=element_blank(), panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
-#         axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour="black"),
-#         plot.title = element_text(size = rel(1.5), face = "bold")) + theme(plot.margin = margin()) +
-#   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5))) +
-#   ggtitle("CV death incidence")
-# 
-# p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
-# p2$widths <- unit(rep(1, ncol(p2)), "null")
-# p2$heights <- unit(rep(1, nrow(p2)), "null")
-# 
-# p3 <- ggplot() +
-#   annotation_custom(p2)
-# 
-# p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
-
+### QDHF
+surv_mod <- coxph(Surv(hf_censtime_yrs, hf_censvar)~qdiabeteshf_survival,data=cohort,method="breslow")
+summary(surv_mod)$concordance[1]
+summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
+summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
+# 0.7244267 (0.7147242-0.7341292)
 
 
 ############################################################################################
 
-# # 3 Is HR constant with baseline QRISK2?
+# # 2 Is HR constant with baseline QRISK2 and baseline QDHF?
+# 
 # ddist <- datadist(cohort); options(datadist='ddist')
 # 
 # 
-# # Unadjusted (QRISK2 5 year score only)
+# # Unadjusted QRISK2
 # 
-# m2 <- cph(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug*rcs(qrisk2_5yr_score,5), data = cohort,x=T,y=T)
-# anova(m2)
+# m <- cph(Surv(hf_censtime_yrs, hf_censvar) ~ studydrug*rcs(qrisk2_5yr_score,5), data = cohort,x=T,y=T)
+# anova(m)
 # 
 # describe(cohort$qrisk2_5yr_score)
 # quantile(cohort$qrisk2_5yr_score, c(.01, .99), na.rm=TRUE)
 # c1 <- quantile(cohort$qrisk2_5yr_score, .01, na.rm=TRUE)
 # c99 <- quantile(cohort$qrisk2_5yr_score, .99, na.rm=TRUE)
 # 
-# contrast_spline.1 <- contrast(m2,list(studydrug = "SGLT2", qrisk2_5yr_score = seq(c1,c99,by=0.05)),list(studydrug = "DPP4SU", qrisk2_5yr_score = seq(c1,c99,by=0.05)))
+# contrast_spline.1 <- contrast(m,list(studydrug = "SGLT2", qrisk2_5yr_score = seq(c1,c99,by=0.05)),list(studydrug = "DPP4SU", qrisk2_5yr_score = seq(c1,c99,by=0.05)))
 # # save the contrast calculations in a dataframe
 # contrast_spline_df <- as.data.frame(contrast_spline.1[c('qrisk2_5yr_score','Contrast','Lower','Upper')])
 # 
-# #plot and save
-# contrast_spline_plot_1 <- ggplot(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) + 
-#   geom_line(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) + 
-#   xlab(expression(paste("QRISK2 5 yr score"))) + 
+# contrast_spline_plot_1 <- ggplot(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) +
+#   geom_line(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) +
+#   xlab(expression(paste("QRISK2 5 yr score"))) +
 #   ylab("HR") +
 #   scale_x_continuous(breaks = seq(0,50,5)) +
 #   #scale_y_continuous(breaks = seq(0.8,1.6,0.1), limits = c(0.8,1.6)) +
 #   geom_ribbon(data=contrast_spline_df,aes(x=qrisk2_5yr_score,ymin=exp(Lower),ymax=exp(Upper)),alpha=0.5) +
 #   geom_hline(yintercept = 1, linetype = "dashed")  +
-#   geom_hline(yintercept = 0.94, linetype = "twodash", color="red", size=1)  +
-#   geom_hline(yintercept = 0.83, linetype = "twodash", color="red")  +
-#   geom_hline(yintercept = 1.07, linetype = "twodash", color="red")  +
+#   geom_hline(yintercept = 0.63, linetype = "twodash", color="red", size=1)  +
+#   geom_hline(yintercept = 0.50, linetype = "twodash", color="red")  +
+#   geom_hline(yintercept = 0.80, linetype = "twodash", color="red")  +
 #   theme(legend.position=c(0.8, 0.1)) +
-#   theme(legend.title = element_blank()) +  
+#   theme(legend.title = element_blank()) +
 #   theme_bw() +
 #   theme(text = element_text(size = 14),
 #         axis.line = element_line(colour =  "grey50" ),
 #         panel.grid.major = element_blank(),
 #         panel.grid.minor = element_blank(),
-#         panel.border = element_blank(), 
+#         panel.border = element_blank(),
 #         panel.background = element_blank()) +
 #   theme(legend.text = element_text(colour="black", size=rel(1))) +
 #   ggtitle("")
@@ -580,14 +276,14 @@ p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 #     geom_histogram(bins = 64, alpha = 0.4, position = "identity") +
 #     guides(fill = FALSE) +
 #     #theme_void() +
-#     theme(legend.title = element_blank(), panel.background = element_rect( fill = "white",color = "grey50")) +  
+#     theme(legend.title = element_blank(), panel.background = element_rect( fill = "white",color = "grey50")) +
 #     scale_x_continuous(breaks = seq(0,50,5)) +
-#     xlab(expression(paste("QRISK2 5 yr score"))) + 
+#     xlab(expression(paste("QRISK2 5 yr score"))) +
 #     #theme(plot.margin = margin()) +
 #     theme(text = element_text(size = 14),
 #           axis.ticks.y = element_blank(),
 #           axis.text.y = element_blank(),
-#           axis.title.y = element_blank()) + 
+#           axis.title.y = element_blank()) +
 #     theme(axis.ticks.y = element_blank(),
 #           axis.text.y = element_blank(),
 #           axis.title.y = element_blank(),
@@ -596,7 +292,7 @@ p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 #           panel.border = element_blank(),
 #           panel.background = element_blank(),
 #           axis.line.x = element_line(color="grey50"))
-#   
+# 
 # }
 # 
 # 
@@ -614,9 +310,9 @@ p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 # 
 # # Plot with 'deciles' of QRISK2 shown
 # #plot and save
-# ggplot(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) + 
-#   geom_line(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) + 
-#   xlab(expression(paste("QRISK2 5 yr score"))) + 
+# ggplot(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) +
+#   geom_line(data=contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) +
+#   xlab(expression(paste("QRISK2 5 yr score"))) +
 #   ylab("HR") +
 #   scale_x_continuous(breaks = seq(0,50,5)) +
 #   #scale_y_continuous(breaks = seq(0.8,1.6,0.1), limits = c(0.8,1.6)) +
@@ -635,13 +331,13 @@ p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 #   geom_vline(xintercept = 16, size=1, colour="grey80")  +
 #   geom_vline(xintercept = 20, size=1, colour="grey80")  +
 #   theme(legend.position=c(0.8, 0.1)) +
-#   theme(legend.title = element_blank()) +  
+#   theme(legend.title = element_blank()) +
 #   theme_bw() +
 #   theme(text = element_text(size = 14),
 #         axis.line = element_line(colour =  "grey50" ),
 #         panel.grid.major = element_blank(),
 #         panel.grid.minor = element_blank(),
-#         panel.border = element_blank(), 
+#         panel.border = element_blank(),
 #         panel.background = element_blank()) +
 #   theme(legend.text = element_text(colour="black", size=rel(1))) +
 #   ggtitle("")
@@ -649,7 +345,7 @@ p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 # 
 # 
 # # Adjusted plot
-# m3 <- cph(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug*rcs(qrisk2_5yr_score,5) + dstartdate_age  + malesex + dstartdate_dm_dur_all + imd2015_10 + drugline_all + ncurrtx,
+# m3 <- cph(Surv(hf_censtime_yrs, hf_censvar) ~ studydrug*rcs(qrisk2_5yr_score,5) + dstartdate_age  + malesex + dstartdate_dm_dur_all + imd2015_10 + drugline_all + ncurrtx,
 #           data = cohort,x=T,y=T)
 # anova(m3)
 # #no interaction
@@ -659,507 +355,303 @@ p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 # new_contrast_spline_df <- as.data.frame(new_contrast_spline.1[c('qrisk2_5yr_score','Contrast','Lower','Upper')])
 # 
 # #plot and save
-# contrast_spline_plot_1 <- ggplot(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) + 
-#   geom_line(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) + 
-#   xlab(expression(paste("QRISK2 5 yr score"))) + 
+# contrast_spline_plot_1 <- ggplot(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast))) +
+#   geom_line(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score, y=exp(Contrast)), size=1) +
+#   xlab(expression(paste("QRISK2 5 yr score"))) +
 #   ylab("HR") +
 #   scale_x_continuous(breaks = seq(0,50,5)) +
 #   #scale_y_continuous(breaks = seq(0.8,1.6,0.1), limits = c(0.8,1.6)) +
 #   geom_ribbon(data=new_contrast_spline_df,aes(x=qrisk2_5yr_score,ymin=exp(Lower),ymax=exp(Upper)),alpha=0.5) +
 #   geom_hline(yintercept = 1, linetype = "dashed")  +
-#   geom_hline(yintercept = 0.94, linetype = "twodash", color="red", size=1)  +
-#   geom_hline(yintercept = 0.83, linetype = "twodash", color="red")  +
-#   geom_hline(yintercept = 1.07, linetype = "twodash", color="red")  +
+#   geom_hline(yintercept = 0.63, linetype = "twodash", color="red", size=1)  +
+#   geom_hline(yintercept = 0.50, linetype = "twodash", color="red")  +
+#   geom_hline(yintercept = 0.80, linetype = "twodash", color="red")  +
 #   theme(legend.position=c(0.8, 0.1)) +
-#   theme(legend.title = element_blank()) +  
+#   theme(legend.title = element_blank()) +
 #   theme_bw() +
 #   theme(text = element_text(size = 14),
 #         axis.line = element_line(colour =  "grey50" ),
 #         panel.grid.major = element_blank(),
 #         panel.grid.minor = element_blank(),
-#         panel.border = element_blank(), 
+#         panel.border = element_blank(),
 #         panel.background = element_blank()) +
 #   theme(legend.text = element_text(colour="black", size=rel(1))) +
 #   ggtitle("")
 # 
 # plot_grid(contrast_spline_plot_1, x_hist, ncol = 1,align = 'hv',
 #           rel_heights = c(1,0.4), rel_widths = c(1,1))
-# 
-# 
-# 
-# 
-# ## Statins at baseline - in last 91 days
-# cohort <- cohort %>%
-#   mutate(baseline_statins=ifelse(!is.na(predrug_latest_statins) & dstartdate-predrug_latest_statins<=91, 1, 0))
-# 
-# cohort %>%
-#   group_by(qrisk2_cat, studydrug) %>%
-#   summarise(total=n(),
-#             baseline_statins_count=sum(baseline_statins, na.rm=TRUE)) %>%
-#   mutate(baseline_statins_perc=round(baseline_statins_count*100/total, 0))
-# 
-# 
-# 
-# ## Statins in followup
-# cohort <- cohort %>%
-#   mutate(statins_in_followup=ifelse(!is.na(postdrug_first_statins) & postdrug_first_statins<mace_censdate, 1, 0))
-# 
-# cohort %>%
-#   group_by(qrisk2_cat, studydrug) %>%
-#   summarise(total=n(),
-#             statins_in_followup_count=sum(statins_in_followup, na.rm=TRUE)) %>%
-#   mutate(statins_in_followup_perc=round(statins_in_followup_count*100/total, 0))
-# 
-# 
-# 
-# ## HbA1c
-# cohort %>% group_by(qrisk2_cat, studydrug) %>% summarise(hba1c=median(prehba1c, na.rm=TRUE))
 
 
 ############################################################################################
 
-# 4 Does calibrating help?
+# 3 Does calibrating help?
 
-# Re-estimate baseline hazard on 20% random sample of control (DPP4SU) arm
-
-## Assign random 20% of DPP4SU arm as calibration cohort and remove from main cohort
+# Assign random 20% of DPP4SU arm as calibration cohort and remove from main cohort
 set.seed(123)
 
 cal_cohort <- cohort %>%
   filter(studydrug=="DPP4SU") %>%
   slice_sample(prop=0.2)
-#18,298
+#19,072
 
 noncal_cohort <- cohort %>%
   anti_join(cal_cohort, by=c("patid", "dstartdate", "studydrug"))
 table(noncal_cohort$studydrug)
-#SGLT2: 48,562 
-#DPP4SU: 73,194  
+#SGLT2: 50,234
+#DPP4SU: 76,290
 
 
-## Re-estimate baseline hazard for females
+# QRISK2
+
+## Females
 ### Original: 0.994671821594238
-cal_females <- cal_cohort %>%
-  filter(malesex==0)
+cal_females <- cal_cohort %>% filter(malesex==0)
+recal_mod <- coxph(Surv(hf_censtime_yrs,hf_censvar)~offset(qrisk2_lin_predictor), data=cal_females)
+female_qrisk2_surv <- summary(survfit(recal_mod),time=5)$surv
+sprintf("%.15f", female_qrisk2_surv)
+# 0.961228613501420 - unsurprisingly much lower
 
-recal_mod <- coxph(Surv(mace_censtime_yrs,mace_censvar)~offset(qrisk2_lin_predictor), data=cal_females)
-female_surv <- summary(survfit(recal_mod),time=5)$surv
-sprintf("%.15f",female_surv)
-# 0.949071594633994
-
-
-## Re-estimate baseline hazard for males
+## Males
 ### Original: 0.989570081233978
-cal_males <- cal_cohort %>%
-  filter(malesex==1)
-
-recal_mod <- coxph(Surv(mace_censtime_yrs,mace_censvar)~offset(qrisk2_lin_predictor), data=cal_males)
-male_surv <- summary(survfit(recal_mod),time=5)$surv
-sprintf("%.15f",male_surv)
-# 0.939301830375210
+cal_males <- cal_cohort %>% filter(malesex==1)
+recal_mod <- coxph(Surv(hf_censtime_yrs,hf_censvar)~offset(qrisk2_lin_predictor), data=cal_males)
+male_qrisk2_surv <- summary(survfit(recal_mod),time=5)$surv
+sprintf("%.15f", male_qrisk2_surv)
+# 0.961097423064088 - unsurprisingly much lower
 
 
-# ## Recalculate QRISK2 and compare to uncalibrated and observed results in calibration cohort
-# cal_cohort <- cal_cohort %>%
-#   group_by(malesex) %>%
-#   mutate(centred_lin_predictor=qrisk2_lin_predictor-mean(qrisk2_lin_predictor)) %>%
-#   ungroup() %>%
-#   mutate(qrisk2_5yr_score_cal=ifelse(malesex==1, (1-(male_surv^exp(centred_lin_predictor)))*100, (1-(female_surv^exp(centred_lin_predictor)))*100))
-# 
-# predicted_cal_cohort <- cal_cohort %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(mean_pred=mean(qrisk2_5yr_score)/100,
-#             mean_pred_cal=mean(qrisk2_5yr_score_cal)/100)
-# 
-# observed_cal_cohort <- survfit(Surv(mace_censtime_yrs, mace_censvar) ~ qrisk2_cat, data=cal_cohort) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed=1-estimate,
-#          lower_ci=1-conf.low,
-#          upper_ci=1-conf.high) %>%
-#   select(observed, lower_ci, upper_ci, strata)
-# 
-# events_cal_cohort <- cal_cohort %>%
-#   filter(mace_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(events=n())
-# 
-# 
-# obs_v_pred <- cbind(predicted_cal_cohort, observed_cal_cohort)
-# 
-# events_table <- data.frame(t(events_cal_cohort)) %>%
-#   rownames_to_column() %>%
-#   filter(rowname!="qrisk2_cat")
-# 
-# 
-# dodge <- position_dodge(width=0.3)
-# 
-# empty_tick <- obs_v_pred %>%
-#   filter(qrisk2_cat==1) %>%
-#   mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_pred=NA, mean_pred_cal=NA, qrisk2_cat=0)
-# 
-# p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat)) + 
-#   geom_point(aes(y = mean_pred*100), position=dodge, shape=4, color="black", size=2, stroke=2) +
-#   geom_point(aes(y = mean_pred_cal*100), position=dodge, shape=4, color="blue", size=2, stroke=2) +
-#   geom_point(aes(y = observed*100), position=dodge, color="darkgreen", alpha=0.5, size=3) +
-#   geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),width=0.25,size=1, position=dodge, color="darkgreen", alpha=0.5) +
-#   theme_bw() +
-#   xlab("QRISK2 category") + ylab("Risk (%)")+
-#   scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-#   scale_y_continuous(breaks=c(seq(0,25,by=5)), limits=c(0,26)) +
-#   theme(panel.border=element_blank(), panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
-#         axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour="black"),
-#         plot.title = element_text(size = rel(1.5), face = "bold")) + theme(plot.margin = margin()) +
-#   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5))) +
-#   ggtitle("(Un)calibrated QRISK2 vs MACE in calibration cohort (n=18,179)")
-# 
-# p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
-# p2$widths <- unit(rep(1, ncol(p2)), "null")
-# p2$heights <- unit(rep(1, nrow(p2)), "null")
-# 
-# p3 <- ggplot() +
-#   annotation_custom(p2)
-# 
-# p1 + p3 + plot_layout(ncol = 1, heights=c(6,1))
-# 
-# 
-# ## C-stats
-# cal_cohort <- cal_cohort %>%
-#   mutate(qrisk2_survival=(100-qrisk2_5yr_score)/100,
-#          qrisk2_survival_cal=(100-qrisk2_5yr_score_cal)/100)
-# 
-# ### Uncalibrated
-# surv_mod <- coxph(Surv(mace_censtime_yrs, mace_censvar)~qrisk2_survival,method="breslow",data=cal_cohort)
-# summary(surv_mod)$concordance[1]
-# summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
-# summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
-# # 0.6762914 (0.6549061-0.6976768)
-# 
-# ### Calibrated
-# surv_mod <- coxph(Surv(mace_censtime_yrs, mace_censvar)~qrisk2_survival_cal,method="breslow",data=cal_cohort)
-# summary(surv_mod)$concordance[1]
-# summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
-# summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
-# # 0.676328 (0.6549465-0.6977095)
+# QDiabetes-HF
+
+## Females
+### Original: 0.985216200351715
+cal_females <- cal_cohort %>% filter(malesex==0)
+recal_mod <- coxph(Surv(hf_censtime_yrs,hf_censvar)~offset(qdiabeteshf_lin_predictor), data=cal_females)
+female_qdhf_surv <- summary(survfit(recal_mod),time=5)$surv
+sprintf("%.15f", female_qdhf_surv)
+# 0.965202142600253
+
+## Males
+### Original: 0.981611728668213
+cal_males <- cal_cohort %>% filter(malesex==1)
+recal_mod <- coxph(Surv(hf_censtime_yrs,hf_censvar)~offset(qdiabeteshf_lin_predictor), data=cal_males)
+male_qdhf_surv <- summary(survfit(recal_mod),time=5)$surv
+sprintf("%.15f", male_qdhf_surv)
+# 0.965209400040619
 
 
 
+# Recalculate scores in rest of cohort
 
-## Recalculate QRISK2 in rest of cohort and compare to uncalibrated and observed results
 noncal_cohort <- noncal_cohort %>%
   group_by(malesex) %>%
-  mutate(centred_lin_predictor=qrisk2_lin_predictor-mean(qrisk2_lin_predictor)) %>%
+  mutate(centred_qrisk2_lin_predictor=qrisk2_lin_predictor-mean(qrisk2_lin_predictor),
+         centred_qdhf_lin_predictor=qdiabeteshf_lin_predictor-mean(qdiabeteshf_lin_predictor)) %>%
   ungroup() %>%
-  mutate(qrisk2_5yr_score_cal=ifelse(malesex==1, (1-(male_surv^exp(centred_lin_predictor)))*100, (1-(female_surv^exp(centred_lin_predictor)))*100))
+  mutate(qrisk2_5yr_score_cal=ifelse(malesex==1, (1-(male_qrisk2_surv^exp(centred_qrisk2_lin_predictor)))*100, (1-(female_qrisk2_surv^exp(centred_qrisk2_lin_predictor)))*100),
+         qdiabeteshf_5yr_score_cal=ifelse(malesex==1, (1-(male_qdhf_surv^exp(centred_qdhf_lin_predictor)))*100, (1-(female_qdhf_surv^exp(centred_qdhf_lin_predictor)))*100))
 
 
-# ### DPP4SU
-# predicted_noncal_dpp4su <- noncal_cohort %>%
-#   filter(studydrug=="DPP4SU") %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(mean_pred=mean(qrisk2_5yr_score)/100,
-#             mean_pred_cal=mean(qrisk2_5yr_score_cal)/100)
-# 
-# observed_noncal_dpp4su <- survfit(Surv(mace_censtime_yrs, mace_censvar) ~ qrisk2_cat, data=noncal_cohort[noncal_cohort$studydrug=="DPP4SU",]) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed=1-estimate,
-#          lower_ci=1-conf.low,
-#          upper_ci=1-conf.high) %>%
-#   select(observed, lower_ci, upper_ci, strata)
-# 
-# events_noncal_dpp4su <- noncal_cohort %>%
-#   filter(studydrug=="DPP4SU" & mace_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(events=n())
-# 
-# 
-# obs_v_pred <- cbind(predicted_noncal_dpp4su, observed_noncal_dpp4su)
-# 
-# events_table <- data.frame(t(events_noncal_dpp4su)) %>%
-#   rownames_to_column() %>%
-#   filter(rowname!="qrisk2_cat")
-# 
-# 
-# dodge <- position_dodge(width=0.3)
-# 
-# empty_tick <- obs_v_pred %>%
-#   filter(qrisk2_cat==1) %>%
-#   mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_pred=NA, mean_pred_cal=NA, qrisk2_cat=0)
-# 
-# p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat)) + 
-#   geom_point(aes(y = mean_pred*100), position=dodge, shape=4, color="black", size=2, stroke=2) +
-#   geom_point(aes(y = mean_pred_cal*100), position=dodge, shape=4, color="blue", size=2, stroke=2) +
-#   geom_point(aes(y = observed*100), position=dodge, color="darkgreen", alpha=0.5, size=3) +
-#   geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),width=0.25,size=1, position=dodge, color="darkgreen", alpha=0.5) +
-#   theme_bw() +
-#   xlab("QRISK2 category") + ylab("Risk (%)")+
-#   scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-#   scale_y_continuous(breaks=c(seq(0,25,by=5)), limits=c(0,26)) +
-#   theme(panel.border=element_blank(), panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
-#         axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour="black"),
-#         plot.title = element_text(size = rel(1.5), face = "bold")) + theme(plot.margin = margin()) +
-#   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5))) +
-#   ggtitle("QRISK2 vs MACE in DPP4SU non-calibration cohort (n=72,683)")
-# 
-# p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
-# p2$widths <- unit(rep(1, ncol(p2)), "null")
-# p2$heights <- unit(rep(1, nrow(p2)), "null")
-# 
-# p3 <- ggplot() +
-#   annotation_custom(p2)
-# 
-# p1 + p3 + plot_layout(ncol = 1, heights=c(6,1))
+# Plot calibrated + uncalibrated + observed scores
+
+# Get mean predicted probabilities for calibrated and uncalibrated
+predicted <- noncal_cohort %>%
+  group_by(qrisk2_cat, studydrug) %>%
+  summarise(mean_qrisk2_pred=mean(qrisk2_5yr_score)/100,
+            mean_qrisk2_pred_cal=mean(qrisk2_5yr_score_cal)/100,
+            mean_qdhf_pred=mean(qdiabeteshf_5yr_score)/100,
+            mean_qdhf_pred_cal=mean(qdiabeteshf_5yr_score_cal)/100)
 
 
-## C-stats
-noncal_cohort <- noncal_cohort %>%
-  mutate(qrisk2_survival=(100-qrisk2_5yr_score)/100,
-         qrisk2_survival_cal=(100-qrisk2_5yr_score_cal)/100)
+# Find actual observed probabilities by QRISK2 category and studydrug
+observed_dpp4su <- survfit(Surv(hf_censtime_yrs, hf_censvar) ~ qrisk2_cat, data=noncal_cohort[noncal_cohort$studydrug=="DPP4SU",]) %>%
+  tidy() %>%
+  group_by(strata) %>%
+  filter(time==max(time)) %>%
+  mutate(observed_dpp4su=1-estimate,
+         lower_ci_dpp4su=1-conf.low,
+         upper_ci_dpp4su=1-conf.high) %>%
+  select(observed_dpp4su, lower_ci_dpp4su, upper_ci_dpp4su, strata)
 
-# ### Uncalibrated
-# surv_mod <- coxph(Surv(mace_censtime_yrs, mace_censvar)~qrisk2_survival,method="breslow",data=noncal_cohort[noncal_cohort$studydrug=="DPP4SU",])
-# summary(surv_mod)$concordance[1]
-# summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
-# summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
-# # 0.6756263 (0.6650895-0.6861631)
-# 
-# ### Calibrated
-# surv_mod <- coxph(Surv(mace_censtime_yrs, mace_censvar)~qrisk2_survival_cal,method="breslow",data=noncal_cohort[noncal_cohort$studydrug=="DPP4SU",])
-# summary(surv_mod)$concordance[1]
-# summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
-# summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
-# # 0.6755896 (0.6650576-0.6861215)
-# 
-# 
-# 
-# ### SGLT2
-# predicted_noncal_sglt2 <- noncal_cohort %>%
-#   filter(studydrug=="SGLT2") %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(mean_pred=mean(qrisk2_5yr_score)/100,
-#             mean_pred_cal=mean(qrisk2_5yr_score_cal)/100)
-# 
-# observed_noncal_sglt2 <- survfit(Surv(mace_censtime_yrs, mace_censvar) ~ qrisk2_cat, data=noncal_cohort[noncal_cohort$studydrug=="SGLT2",]) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed=1-estimate,
-#          lower_ci=1-conf.low,
-#          upper_ci=1-conf.high) %>%
-#   select(observed, lower_ci, upper_ci, strata)
-# 
-# events_noncal_sglt2 <- noncal_cohort %>%
-#   filter(studydrug=="SGLT2" & mace_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(events=n())
-# 
-# 
-# obs_v_pred <- cbind(predicted_noncal_sglt2, observed_noncal_sglt2)
-# 
-# events_table <- data.frame(t(events_noncal_sglt2)) %>%
-#   rownames_to_column() %>%
-#   filter(rowname!="qrisk2_cat")
-# 
-# 
-# dodge <- position_dodge(width=0.3)
-# 
-# empty_tick <- obs_v_pred %>%
-#   filter(qrisk2_cat==1) %>%
-#   mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_pred=NA, mean_pred_cal=NA, qrisk2_cat=0)
-# 
-# p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat)) + 
-#   geom_point(aes(y = mean_pred*100), position=dodge, shape=4, color="black", size=2, stroke=2) +
-#   geom_point(aes(y = mean_pred_cal*100), position=dodge, shape=4, color="blue", size=2, stroke=2) +
-#   geom_point(aes(y = observed*100), position=dodge, color="darkgreen", alpha=0.5, size=3) +
-#   geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),width=0.25,size=1, position=dodge, color="darkgreen", alpha=0.5) +
-#   theme_bw() +
-#   xlab("QRISK2 category") + ylab("Risk (%)")+
-#   scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-#   scale_y_continuous(breaks=c(seq(0,25,by=5)), limits=c(0,26)) +
-#   theme(panel.border=element_blank(), panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
-#         axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour="black"),
-#         plot.title = element_text(size = rel(1.5), face = "bold")) + theme(plot.margin = margin()) +
-#   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5))) +
-#   ggtitle("QRISK2 vs MACE in SGLT2 arm (n=48,279)")
-# 
-# p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
-# p2$widths <- unit(rep(1, ncol(p2)), "null")
-# p2$heights <- unit(rep(1, nrow(p2)), "null")
-# 
-# p3 <- ggplot() +
-#   annotation_custom(p2)
-# 
-# p1 + p3 + plot_layout(ncol = 1, heights=c(6,1))
-# 
-# 
-# ## C-stats
-# 
-# ### Uncalibrated
-# surv_mod <- coxph(Surv(mace_censtime_yrs, mace_censvar)~qrisk2_survival,method="breslow",data=noncal_cohort[noncal_cohort$studydrug=="SGLT2",])
-# summary(surv_mod)$concordance[1]
-# summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
-# summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
-# # 0.6729413 (0.6561626-0.68972)
-# 
-# ### Calibrated
-# surv_mod <- coxph(Surv(mace_censtime_yrs, mace_censvar)~qrisk2_survival_cal,method="breslow",data=noncal_cohort[noncal_cohort$studydrug=="SGLT2",])
-# summary(surv_mod)$concordance[1]
-# summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
-# summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
-# # 0.6730351 (0.6562606-0.6898097)
+dpp4su_events <- cohort %>%
+  filter(studydrug=="DPP4SU" & hf_censvar==1) %>%
+  group_by(qrisk2_cat) %>%
+  summarise(DPP4SU=n())
+
+observed_sglt2 <- survfit(Surv(hf_censtime_yrs, hf_censvar) ~ qrisk2_cat, data=noncal_cohort[noncal_cohort$studydrug=="SGLT2",]) %>%
+  tidy() %>%
+  group_by(strata) %>%
+  filter(time==max(time)) %>%
+  mutate(observed_sglt2=1-estimate,
+         lower_ci_sglt2=1-conf.low,
+         upper_ci_sglt2=1-conf.high) %>%
+  select(observed_sglt2, lower_ci_sglt2, upper_ci_sglt2, strata)
+
+sglt2_events <- cohort %>%
+  filter(studydrug=="SGLT2" & hf_censvar==1) %>%
+  group_by(qrisk2_cat) %>%
+  summarise(SGLT2=n())
+
+
+obs_v_pred <- rbind(
+  cbind((predicted %>% filter(studydrug=="DPP4SU")), observed_dpp4su),
+  cbind((predicted %>% filter(studydrug=="SGLT2")), observed_sglt2)
+) %>%
+  mutate(observed=coalesce(observed_dpp4su, observed_sglt2),
+         lower_ci=coalesce(lower_ci_dpp4su, lower_ci_sglt2),
+         upper_ci=coalesce(upper_ci_dpp4su, upper_ci_sglt2))
+
+events_table <- data.frame(t(dpp4su_events %>%
+                               inner_join(sglt2_events))) %>%
+  rownames_to_column() %>%
+  filter(rowname!="qrisk2_cat")
+
+
+dodge <- position_dodge(width=0.3)
+
+empty_tick <- obs_v_pred %>%
+  filter(qrisk2_cat==1) %>%
+  mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_qrisk2_pred=NA, mean_qrisk2_pred_cal=NA, mean_qdhf_pred=NA, mean_qdhf_pred_cal=NA, qrisk2_cat=0)
+
+p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat, group=studydrug, color=studydrug)) +
+  geom_point(aes(y = observed*100), position=dodge) +
+  geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),width=0.25,size=1, position=dodge) +
+  geom_point(aes(y = mean_qrisk2_pred*100), position=dodge, shape=17, size=2) +
+  geom_point(aes(y = mean_qrisk2_pred_cal*100), position=dodge, shape=24, size=2, color="black") +
+  geom_point(aes(y = mean_qdhf_pred*100), position=dodge, shape=15, size=2) +
+  geom_point(aes(y = mean_qdhf_pred_cal*100), position=dodge, shape=22, size=2, color="black") +
+  theme_bw() +
+  xlab("QRISK2 category") + ylab("Risk (%)")+
+  scale_x_continuous(breaks=c(seq(0,10,by=1)))+
+  scale_y_continuous(breaks=c(seq(0,30,by=5)), limits=c(0,31)) +
+  theme(panel.border=element_blank(), panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
+        axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour="black"),
+        plot.title = element_text(size = rel(1.5), face = "bold")) + theme(plot.margin = margin()) +
+  theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5))) +
+  ggtitle("Uncalibrated/calibrated QRISK2/QDHF vs HF incidence (5 year)")
+
+p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
+p2$widths <- unit(rep(1, ncol(p2)), "null")
+p2$heights <- unit(rep(1, nrow(p2)), "null")
+
+p3 <- ggplot() +
+  annotation_custom(p2)
+
+p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
+
 
 ############################################################################################
 
-# 5 Look at survival benefit from SGLT2s when add hazard ratio from trials meta-analysis
+# 4 Look at survival benefit from SGLT2s when add hazard ratio from trials meta-analysis
 # https://jamanetwork.com/journals/jamacardiology/fullarticle/2771459
-
 
 # Add HR from trials
 noncal_cohort <- noncal_cohort %>%
-  mutate(qrisk2_survival_cal_sglt2=qrisk2_survival_cal^0.94,
-         qrisk2_5yr_score_cal_sglt2=100-(qrisk2_survival_cal_sglt2*100))
-
-
-# # Does QRISK2+HR perform better than QRISK2 in SGLT2 arm?
-# predicted_sglt2 <- noncal_cohort %>%
-#   filter(studydrug=="SGLT2") %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(mean_pred_cal=mean(qrisk2_5yr_score_cal)/100,
-#             mean_pred_cal_sglt2=mean(qrisk2_5yr_score_cal_sglt2)/100)
-# 
-# observed_sglt2 <- survfit(Surv(mace_censtime_yrs, mace_censvar) ~ qrisk2_cat, data=noncal_cohort[noncal_cohort$studydrug=="SGLT2",]) %>%
-#   tidy() %>%
-#   group_by(strata) %>%
-#   filter(time==max(time)) %>%
-#   mutate(observed=1-estimate,
-#          lower_ci=1-conf.low,
-#          upper_ci=1-conf.high) %>%
-#   select(observed, lower_ci, upper_ci, strata)
-# 
-# events_sglt2 <- noncal_cohort %>%
-#   filter(studydrug=="SGLT2" & mace_censvar==1) %>%
-#   group_by(qrisk2_cat) %>%
-#   summarise(events=n())
-# 
-# 
-# obs_v_pred <- cbind(predicted_sglt2, observed_sglt2)
-# 
-# events_table <- data.frame(t(events_sglt2)) %>%
-#   rownames_to_column() %>%
-#   filter(rowname!="qrisk2_cat")
-# 
-# 
-# dodge <- position_dodge(width=0.3)
-# 
-# empty_tick <- obs_v_pred %>%
-#   filter(qrisk2_cat==1) %>%
-#   mutate(observed=NA, lower_ci=NA, upper_ci=NA, mean_pred_cal=NA, mean_pred_cal_sglt2=NA, qrisk2_cat=0)
-# 
-# p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=qrisk2_cat)) + 
-#   geom_point(aes(y = mean_pred_cal_sglt2*100), position=dodge, shape=4, color="red", size=2, stroke=2) +
-#   geom_point(aes(y = mean_pred_cal*100), position=dodge, shape=4, color="blue", size=2, stroke=2) +
-#   geom_point(aes(y = observed*100), position=dodge, color="darkgreen", alpha=0.5, size=3) +
-#   geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),width=0.25,size=1, position=dodge, color="darkgreen", alpha=0.5) +
-#   theme_bw() +
-#   xlab("QRISK2 category") + ylab("Risk (%)")+
-#   scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-#   scale_y_continuous(breaks=c(seq(0,25,by=5)), limits=c(0,26)) +
-#   theme(panel.border=element_blank(), panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
-#         axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour="black"),
-#         plot.title = element_text(size = rel(1.5), face = "bold")) + theme(plot.margin = margin()) +
-#   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5))) +
-#   ggtitle("QRISK2 vs MACE in SGLT2 arm (n=48,279)")
-# 
-# p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
-# p2$widths <- unit(rep(1, ncol(p2)), "null")
-# p2$heights <- unit(rep(1, nrow(p2)), "null")
-# 
-# p3 <- ggplot() +
-#   annotation_custom(p2)
-# 
-# p1 + p3 + plot_layout(ncol = 1, heights=c(6,1))
-# 
-# 
-# ## C-stats
-# 
-# ### QRISK2 alone
-# surv_mod <- coxph(Surv(mace_censtime_yrs, mace_censvar)~qrisk2_survival_cal,method="breslow",data=noncal_cohort[noncal_cohort$studydrug=="SGLT2",])
-# summary(surv_mod)$concordance[1]
-# summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
-# summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
-# # 0.6730351 (0.6562606-0.6898097)
-# 
-# ### QRISK2 + HR
-# surv_mod <- coxph(Surv(mace_censtime_yrs, mace_censvar)~qrisk2_survival_cal_sglt2,method="breslow",data=noncal_cohort[noncal_cohort$studydrug=="SGLT2",])
-# summary(surv_mod)$concordance[1]
-# summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2])
-# summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2])
-# # 0.6730351 (0.6562606-0.6898097)
-
-
-
+  mutate(qrisk2_survival_cal=(100-qrisk2_5yr_score_cal)/100,
+         qrisk2_survival_cal_sglt2=qrisk2_survival_cal^0.63,
+         qrisk2_5yr_score_cal_sglt2=100-(qrisk2_survival_cal_sglt2*100),
+         
+         qdhf_survival_cal=(100-qdiabeteshf_5yr_score_cal)/100,
+         qdhf_survival_cal_sglt2=qdhf_survival_cal^0.63,
+         qdiabeteshf_5yr_score_cal_sglt2=100-(qdhf_survival_cal_sglt2*100))
 
 
 # Distribution of predicted benefits
 noncal_cohort <- noncal_cohort %>%
-  mutate(sglt2_benefit=qrisk2_survival_cal_sglt2-qrisk2_survival_cal)
-describe(noncal_cohort$sglt2_benefit)
-#mean=0.39%
+  mutate(qrisk2_sglt2_benefit=qrisk2_survival_cal_sglt2-qrisk2_survival_cal,
+         qdhf_sglt2_benefit=qdhf_survival_cal_sglt2-qdhf_survival_cal)
 
-ggplot (noncal_cohort, aes(x=sglt2_benefit*100)) + 
-  geom_histogram(binwidth=0.05)
+describe(noncal_cohort$qrisk2_sglt2_benefit)
+#mean=1.8%
+
+describe(noncal_cohort$qdhf_sglt2_benefit)
+#mean=1.7%
+
+test <- noncal_cohort %>% select(qrisk2_sglt2_benefit, qdhf_sglt2_benefit) %>% pivot_longer(cols=c(qrisk2_sglt2_benefit, qdhf_sglt2_benefit))
+
+ggplot(test, aes(x=value*100, color=name, fill=name)) + 
+  geom_histogram(binwidth=0.05, alpha=0.5, position="identity") +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=14),
+        legend.text=element_text(size=14),
+        legend.title=element_text(size=14))
 
 
-noncal_cohort %>% count()
-#121,756
 
-noncal_cohort %>% filter(sglt2_benefit<0.01) %>% count()
-#118,703
+
+
+# Quartile plots
+
+# Cut into quartiles of absolute risk
+noncal_cohort$hf.risk.quartile <- ntile(noncal_cohort$qdiabeteshf_5yr_score_cal, 4)
+
+## Average benefit per quartile
+noncal_cohort %>%
+  group_by(hf.risk.quartile) %>%
+  summarise(pred.mean=mean(qdiabeteshf_5yr_score_cal,na.rm=T),
+            pred.median=median(qdiabeteshf_5yr_score_cal,na.rm=T),
+            sd=sd(qdiabeteshf_5yr_score_cal,na.rm=T),
+            l_iqr=quantile(qdiabeteshf_5yr_score_cal,na.rm=T,probs=0.25),
+            u_iqr=quantile(qdiabeteshf_5yr_score_cal,na.rm=T,probs=0.75),
+            min=min(qdiabeteshf_5yr_score_cal,na.rm=T),
+            max=max(qdiabeteshf_5yr_score_cal,na.rm=T))
+
+
+### Quartile 4
+noncal_cohort$studydrug=factor(noncal_cohort$studydrug, levels=c("SGLT2","DPP4SU"))
+sfit <- survfit(Surv(hf_censtime_yrs, hf_censvar) ~ studydrug, data = noncal_cohort, subset=hf.risk.quartile==4)
+plot4 <- ggsurvplot(sfit,
+                    fun = function(x) {100 - x*100},             # Cumulative probability plot
+                    censor = F,
+                    size= 1.5,
+                    legend.title = "" ,
+                    legend.labs = c("SGLT2","DPP4SU"),
+                    #legend.title = "",
+                    risk.table = F,       # show risk table.
+                    conf.int = T,         # show confidence intervals for
+                    # point estimates of survival curves.
+                    #xlim = c(0,0.06),         # present narrower X axis, but not affect
+                    # survival estimates.
+                    ylim = c(0,21),
+                    xlab = "Years",   # customize X axis label.
+                    ylab = "Heart failure incidence (%)",   # customize X axis label.
+                    break.time.by = 1,     # break X axis in time intervals every two years.
+                    ggtheme = theme_classic(), # customize plot and risk table with a theme.
+                    risk.table.y.text.col = TRUE, # colour risk table text annotations.
+                    #fontsize = 10, # in legend of risk table
+                    font.legend=16,
+                    font.x = c(18),font.y = c(18),font.tickslab = c(18),
+                    axes.offset = FALSE, # start the axis at the origin
+                    #palette = c("#998ec3","#f1a340"),
+                    #linetype = c("strata"),
+                    #legend = "none",
+                    legend = "right", 
+                    #title = "Predicted 5yr MACE risk 12.7%",
+                    #tables.theme = theme_cleantable() # clean theme for tables
+                    
+) 
+plot4
+
+
 
 
 # Compare predicted and actual benefits by decile (predicted = mean of decile, as previous)
 
-noncal_cohort$sglt2_benefit_decile <- ntile(noncal_cohort$sglt2_benefit, 10)
+## Unadjusted
+
+## QRISK2
+
+noncal_cohort$sglt2_benefit_decile <- ntile(noncal_cohort$qrisk2_sglt2_benefit, 10)
 noncal_cohort <- noncal_cohort %>% mutate(sglt2_benefit_decile=as.factor(sglt2_benefit_decile))
 
 pred <- noncal_cohort %>%
   group_by(sglt2_benefit_decile) %>%
-  summarise(mean_predicted_benefit=mean(sglt2_benefit, na.rm=T)) 
+  summarise(mean_qrisk2_predicted_benefit=mean(qrisk2_sglt2_benefit, na.rm=T))
 
 
-
-# Unadjusted
-# ### Old
-# obs <- data.frame(matrix(nrow=0, ncol=4))
-# colnames(obs)= c("sglt2_benefit_decile", "surv", "lower_ci", "upper_ci")
-# 
-# obs <- data.frame(matrix(nrow=0, ncol=4))
-# colnames(obs)= c("sglt2_benefit_decile", "surv", "lower_ci", "upper_ci")
-# 
-# for (i in 1:10) {
-#   x <- summary(survfit(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug, data=noncal_cohort, subset=sglt2_benefit_decile==i),times=5)
-# 
-#   se <- sqrt(x$std.err[2]^2 + x$std.err[1]^2)
-# 
-#   obs_decile <- data.frame(sglt2_benefit_decile=i, surv_diff=x$surv[2]-x$surv[1]) %>%
-#     mutate(lower_ci=surv_diff-(1.96*se),
-#            upper_ci=surv_diff+(1.96*se))
-# 
-#   obs <- rbind(obs, obs_decile)
-# 
-# }
-
-
-
-### New
 noncal_cohort <- noncal_cohort %>% mutate(studydrug=as.vector(studydrug))
 ddist <- datadist(noncal_cohort)
 
-
-model <- cph(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug*sglt2_benefit_decile, data=noncal_cohort, x=TRUE, y=TRUE, surv=TRUE)
+model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~ studydrug*sglt2_benefit_decile, data=noncal_cohort, x=TRUE, y=TRUE, surv=TRUE)
 
 survival_est <- survest(model, newdata=expand.grid(studydrug=c("SGLT2","DPP4SU"), sglt2_benefit_decile=c(1:10)), times=5)
 
@@ -1207,14 +699,14 @@ empty_tick <- obs_v_pred %>%
   filter(sglt2_benefit_decile==1) %>%
   mutate(mean_predicted_benefit=NA, surv_diff=NA, lower_ci=NA, upper_ci=NA, sglt2_benefit_decile=as.factor(0))
 
-p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=mean_predicted_benefit*100)) + 
+p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=mean_qrisk2_predicted_benefit*100)) + 
   geom_point(aes(y = surv_diff*100)) +
   geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),alpha=1) +
   theme_bw() +
   geom_abline(slope=1, intercept=0) +
   xlab("Predicted SGLT2 benefit (mean by predicted decile)") + ylab("Observed SGLT2 benefit (by predicted decile)") +
-  scale_x_continuous(breaks=c(seq(0,1,by=0.25)), limits=c(0,1)) +
-  scale_y_continuous(breaks=c(seq(-3,6,by=1)), limits=c(-3,6)) +
+  scale_x_continuous(breaks=c(seq(0,5,by=1)), limits=c(0,5)) +
+  scale_y_continuous(breaks=c(seq(-2,6,by=1)), limits=c(-2,6)) +
   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5)))
 
 p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
@@ -1226,22 +718,30 @@ p3 <- ggplot() +
 
 p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 
-
 #NNT
-
 obs_v_pred <- obs_v_pred %>%
-  mutate(nnt_predicted=1/(mean_predicted_benefit*100),
+  mutate(nnt_predicted=1/(mean_qdhf_predicted_benefit*100),
          nnt_observed=1/(surv_diff*100))
-
 obs_v_pred
 
 
 
+## QDHF
 
-## Adjusted for age, sex, duration, IMD, drugline and ncurrtx
-model <- cph(Surv(mace_censtime_yrs, mace_censvar) ~ studydrug*sglt2_benefit_decile + dstartdate_age, data=noncal_cohort, x=TRUE, y=TRUE, surv=TRUE)
+noncal_cohort$sglt2_benefit_decile <- ntile(noncal_cohort$qdhf_sglt2_benefit, 10)
+noncal_cohort <- noncal_cohort %>% mutate(sglt2_benefit_decile=as.factor(sglt2_benefit_decile))
 
-survival_est <- survest(model, newdata=expand.grid(studydrug=c("SGLT2","DPP4SU"), sglt2_benefit_decile=c(1:10), dstartdate_age=noncal_cohort$dstartdate_age), times=5)
+pred <- noncal_cohort %>%
+  group_by(sglt2_benefit_decile) %>%
+  summarise(mean_qdhf_predicted_benefit=mean(qdhf_sglt2_benefit, na.rm=T))
+
+
+noncal_cohort <- noncal_cohort %>% mutate(studydrug=as.vector(studydrug))
+ddist <- datadist(noncal_cohort)
+
+model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~ studydrug*sglt2_benefit_decile, data=noncal_cohort, x=TRUE, y=TRUE, surv=TRUE)
+
+survival_est <- survest(model, newdata=expand.grid(studydrug=c("SGLT2","DPP4SU"), sglt2_benefit_decile=c(1:10)), times=5)
 
 
 obs <- data.frame(surv=unlist(survival_est$surv), studydrug=rep(c("SGLT2","DPP4SU"),5), sglt2_benefit_decile=rep(1:10, rep_len(2, 10)))
@@ -1287,14 +787,14 @@ empty_tick <- obs_v_pred %>%
   filter(sglt2_benefit_decile==1) %>%
   mutate(mean_predicted_benefit=NA, surv_diff=NA, lower_ci=NA, upper_ci=NA, sglt2_benefit_decile=as.factor(0))
 
-p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=mean_predicted_benefit*100)) + 
+p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=mean_qdhf_predicted_benefit*100)) + 
   geom_point(aes(y = surv_diff*100)) +
   geom_errorbar(aes(ymax=upper_ci*100,ymin=lower_ci*100),alpha=1) +
   theme_bw() +
   geom_abline(slope=1, intercept=0) +
   xlab("Predicted SGLT2 benefit (mean by predicted decile)") + ylab("Observed SGLT2 benefit (by predicted decile)") +
-  scale_x_continuous(breaks=c(seq(0,1,by=0.25)), limits=c(0,1)) +
-  scale_y_continuous(breaks=c(seq(-3,6,by=1)), limits=c(-3,6)) +
+  scale_x_continuous(breaks=c(seq(0,6,by=1)), limits=c(0,6)) +
+  scale_y_continuous(breaks=c(seq(-2,8,by=1)), limits=c(-2,8)) +
   theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5)))
 
 p2 <- gridExtra::tableGrob(events_table, rows = NULL, cols = NULL)
@@ -1306,15 +806,124 @@ p3 <- ggplot() +
 
 p1 + p3 + plot_layout(ncol = 1, heights=c(5,1))
 
-
-
 #NNT
-
 obs_v_pred <- obs_v_pred %>%
-  mutate(nnt_predicted=1/(mean_predicted_benefit*100),
+  mutate(nnt_predicted=1/(mean_qdhf_predicted_benefit*100),
          nnt_observed=1/(surv_diff*100))
-
 obs_v_pred
+
+
+
+
+## Observed adjusted for age, sex, duration, IMD, drugline and ncurrtx
+
+## QRISK2
+
+memory.limit(size=40000)
+gc()
+
+noncal_cohort$sglt2_benefit_decile <- ntile(noncal_cohort$qrisk2_sglt2_benefit, 10)
+noncal_cohort <- noncal_cohort %>% mutate(sglt2_benefit_decile=as.factor(sglt2_benefit_decile))
+
+# model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + drugline_all + ncurrtx, data=noncal_cohort, x=TRUE, y=TRUE, surv=TRUE)
+# 
+# obs_SGLT2 <- noncal_cohort %>%
+#   select(patid, sglt2_benefit_decile, dstartdate_age, malesex, dstartdate_dm_dur_all, imd2015_10, drugline_all, ncurrtx) %>%
+#   mutate(studydrug="SGLT2",
+#          rowno=row_number())
+# 
+# observed_sglt2 <- survfit(model, newdata=as.data.frame(obs_SGLT2)) %>%
+#   tidy() %>%
+#   filter(time==5) %>%
+#   pivot_longer(cols=-c(time, n.risk, n.event, n.censor), names_to = c(".value", "group"), names_pattern = "(.*)\\.(.*)") %>%
+#   select(group, estimate_sglt2=estimate) %>%
+#   mutate(group=as.numeric(group)) %>%
+#   inner_join(obs_SGLT2, by=c("group"="rowno"))
+# 
+# save(observed_sglt2, file="../../Raw data/HF_adjust_SGLT2.Rda")
+# 
+# obs_DPP4SU <- noncal_cohort %>%
+#   select(patid, sglt2_benefit_decile, dstartdate_age, malesex, dstartdate_dm_dur_all, imd2015_10, drugline_all, ncurrtx) %>%
+#   mutate(studydrug="DPP4SU",
+#          rowno=row_number())
+# 
+# observed_dpp4su <- survfit(model, newdata=as.data.frame(obs_DPP4SU)) %>%
+#   tidy() %>%
+#   filter(time==5) %>%
+#   pivot_longer(cols=-c(time, n.risk, n.event, n.censor), names_to = c(".value", "group"), names_pattern = "(.*)\\.(.*)") %>%
+#   select(group, estimate_dpp4su=estimate) %>%
+#   mutate(group=as.numeric(group)) %>%
+#   inner_join(obs_DPP4SU, by=c("group"="rowno"))
+# 
+# save(observed_dpp4su, file="../../Raw data/HF_adjust_DPP4SU.Rda")
+
+load("../../Raw data/HF_adjust_SGLT2.Rda")
+load("../../Raw data/HF_adjust_DPP4SU.Rda")
+
+observed <- observed_sglt2 %>%
+  select(group, estimate_sglt2) %>%
+  inner_join(observed_dpp4su, by="group") %>%
+  mutate(survdiff=estimate_sglt2-estimate_dpp4su) %>%
+  group_by(sglt2_benefit_decile) %>%
+  summarise(mean_benefit=mean(survdiff),
+            median_benefit=median(survdiff),
+            lq_benefit=quantile(survdiff, prob=c(.25)),
+            uq_benefit=quantile(survdiff, prob=c(.75)))
+
+### Predicted same as previous
+pred <- noncal_cohort %>%
+  group_by(sglt2_benefit_decile) %>%
+  summarise(median_qrisk2_predicted_benefit=median(qrisk2_sglt2_benefit, na.rm=T))
+
+
+obs_v_pred <- pred %>% inner_join(observed, by="sglt2_benefit_decile")
+
+
+empty_tick <- obs_v_pred %>%
+  filter(sglt2_benefit_decile==1) %>%
+  mutate(mean_benefit=NA, median_benefit=NA, lq_benefit=NA, uq_benefit=NA, mean_qrisk2_predicted_benefit=NA, sglt2_benefit_decile=as.factor(0))
+
+p1 <- ggplot(data=bind_rows(empty_tick,obs_v_pred), aes(x=median_qrisk2_predicted_benefit*100)) + 
+  geom_point(aes(y = median_benefit*100)) +
+  geom_errorbar(aes(ymax=uq_benefit*100,ymin=lq_benefit*100),alpha=1) +
+  theme_bw() +
+  geom_abline(slope=1, intercept=0) +
+  xlab("Predicted SGLT2 benefit (mean by predicted decile)") + ylab("Observed SGLT2 benefit (by predicted decile)") +
+  scale_x_continuous(breaks=c(seq(0,6,by=1)), limits=c(0,6)) +
+  scale_y_continuous(breaks=c(seq(-2,6,by=1)), limits=c(-2,8)) +
+  theme(axis.text=element_text(size=rel(1.5)))+ theme(axis.title=element_text(size=rel(1.5)))
+
+p1
+
+
+
+
+
+noncal_cohort$sglt2_benefit_decile <- ntile(noncal_cohort$qrisk2_sglt2_benefit, 10)
+noncal_cohort <- noncal_cohort %>% mutate(sglt2_benefit_decile=as.factor(sglt2_benefit_decile))
+
+pred <- noncal_cohort %>%
+  group_by(sglt2_benefit_decile) %>%
+  summarise(mean_qrisk2_predicted_benefit=mean(qrisk2_sglt2_benefit, na.rm=T))
+
+
+noncal_cohort <- noncal_cohort %>% mutate(studydrug=as.vector(studydrug))
+ddist <- datadist(noncal_cohort)
+
+model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~ studydrug + dstartdate_age + malesex + dstartdate_dm_dur_all + imd2015_10 + drugline_all + ncurrtx + qrisk2_5yr_score, data=noncal_cohort, x=TRUE, y=TRUE, surv=TRUE)
+
+obs_SGLT2 <- noncal_cohort %>%
+    select(patid, sglt2_benefit_decile, dstartdate_age, malesex, dstartdate_dm_dur_all, imd2015_10, drugline_all, ncurrtx, qrisk2_5yr_score) %>%
+    mutate(studydrug="SGLT2",
+           rowno=row_number())
+
+
+memory.limit(size=40000)
+gc()
+survival_est2 <- survest(model, newdata=as.data.frame(obs_SGLT2), times=5)
+
+
+
 
 
 

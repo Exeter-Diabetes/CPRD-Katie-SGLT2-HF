@@ -1,22 +1,4 @@
 
-# Exploring QRISK2 for predicting MACE incidence
-
-## 1 Uncalibrated 5-year QRISK2 vs MACE incidence in both arms (report C-stat + number of events)
-
-## 2 As per 1, but individual components of MACE
-
-## 3 (Uncalibrated) 5-year QRISK2 vs hazard ratio for MACE (is HR constant by baseline QRISK2? Report ANOVA)
-
-## 4 Calibrate 5-year QRISK2 on 20% sample of control arm (DPP4SU) - report C-stat before and after and plot
-## Recalculate 5-year QRISK2 for control and study arm (report C-stat before and after and plot)
-
-## 5 Plot unadjusted predicted benefit vs actual benefit by benefit decile/categories
-## Plot adjusted version of above (adjust for...)
-
-### 6 Number needed to treat per benefit decile/category for predicted and actual benefit
-
-# Not including GLP1 for now
-
 
 ############################################################################################
 
@@ -73,6 +55,39 @@ rm(list=setdiff(ls(), "cohort"))
 
 
 ############################################################################################
+
+# Calibrate all scores
+
+# QRISK2 vs QDHF for heartfailure
+
+
+
+
+
+
+
+ggplot(cohort, aes(x=qrisk2_5yr_score, y=qdiabeteshf_5yr_score)) + 
+  geom_point(shape=16, alpha = 0.3, size = 0.8, colour="#507f9e") + 
+  geom_smooth(method=lm, se=F, alpha = 0.3, fill="red", colour="red", size =0.6) +
+  scale_y_continuous(limits=c(0,60), breaks=seq(0,60,20), expand = c(0,0)) +
+  scale_x_continuous(limits=c(0,80), breaks=seq(0,80,20), expand = c(0,0)) +
+  xlab("QRISK2") +
+  ylab("QDHF") +
+  theme(axis.line = element_line(colour="black", size = 0.3, linetype = "solid"),
+        panel.background = element_rect(fill="white"),
+        axis.text.x=element_text(size = 11, margin = margin(t = 6)),
+        axis.text.y=element_text(size = 11, margin = margin(r = 6)),
+        axis.title.x = element_text(size = 11, margin = margin(t = 10)),
+        axis.title.y = element_text(size = 11, margin = margin(r = 6)),
+        plot.margin = margin(10, 10, 10, 10))
+
+
+
+
+
+
+
+
 
 # 1 How well does uncalibrated QRISK predict 5-year MACE incidence?
 

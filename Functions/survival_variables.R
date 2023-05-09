@@ -1,6 +1,6 @@
 
 # Produce survival variables for all endpoints (including for sensitivity analysis)
-## All censored at 5 years post drug start / end of GP records / death / starting a different diabetes med which affects CV risk (TZD/GLP1/SGLT2), and also drug stop date + 6 months for per-protocol analysis
+## All censored at 5 years post drug start (3 years for 'ckd_egfr40') / end of GP records / death / starting a different diabetes med which affects CV risk (TZD/GLP1/SGLT2), and also drug stop date + 6 months for per-protocol analysis
 
 # Main analysis:
 ## 'mace': stroke, MI, CV death
@@ -41,6 +41,24 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
                         dstopdate+183,
                         na.rm=TRUE),
            
+           cens_itt_3_yrs=pmin(dstartdate+(365.25*3),
+                               gp_record_end,
+                               death_date,
+                               next_tzd_start,
+                               if_else(studydrug!="GLP1", next_glp1_start, as.Date("2050-01-01")),
+                               if_else(studydrug!="SGLT2", next_sglt2_start, as.Date("2050-01-01")),
+                               na.rm=TRUE),
+           
+           cens_pp_3_yrs=pmin(dstartdate+(365.25*3),
+                              gp_record_end,
+                              death_date,
+                              next_tzd_start,
+                              if_else(studydrug!="GLP1", next_glp1_start, as.Date("2050-01-01")),
+                              if_else(studydrug!="SGLT2", next_sglt2_start, as.Date("2050-01-01")),
+                              dstopdate+183,
+                              na.rm=TRUE),
+                        
+           
            mace_outcome=pmin(postdrug_first_myocardialinfarction,
                              postdrug_first_stroke,
                              cv_death_date_any_cause,
@@ -76,12 +94,19 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
     censvar_var=paste0(i, "_censvar")
     censtime_var=paste0(i, "_censtime_yrs")
     
+    if (i=="ckd_egfr40") {
+      cohort <- cohort %>%
+        mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_itt_3_yrs, na.rm=TRUE),
+               {{censvar_var}}:=ifelse(!is.na(!!sym(outcome_var)) & !!sym(censdate_var)==!!sym(outcome_var), 1, 0),
+               {{censtime_var}}:=as.numeric(difftime(!!sym(censdate_var), dstartdate, unit="days"))/365.25)
+    } else {
     cohort <- cohort %>%
       mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_itt, na.rm=TRUE),
              {{censvar_var}}:=ifelse(!is.na(!!sym(outcome_var)) & !!sym(censdate_var)==!!sym(outcome_var), 1, 0),
              {{censtime_var}}:=as.numeric(difftime(!!sym(censdate_var), dstartdate, unit="days"))/365.25)
-    
     }
+    
+  }
   
   if (main_only==TRUE) {
     message(paste("survival variables for", paste(main_outcomes, collapse=", "), "added"))
@@ -126,8 +151,13 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
         
         outcome_var=paste0(substr(i, 1,  nchar(i)-3), "_outcome")
         
-        cohort <- cohort %>%
-          mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_pp, na.rm=TRUE))
+        if (i=="ckd_egfr40_pp") {
+          cohort <- cohort %>%
+            mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_pp_3_yrs, na.rm=TRUE))
+        } else {
+          cohort <- cohort %>%
+            mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_pp, na.rm=TRUE))
+        }
                  
       }
 
