@@ -45,14 +45,13 @@ Additional: QRISK3 paper states that for SBP, BMI, and smoking status, the most 
 
 ### Algorithm coding
 
-The QRISK2 algorithm was taken from 
+Code for implementing the QDiabetes-Heart Failure 2015 and QRISK2 2017 algorithms were adapted from the open source software available on their respective websites (QDHF: https://qdiabetes.org/index.php; QRISK2 no longer available) and are included in the [EHRBiomarkr R package](https://github.com/Exeter-Diabetes/EHRBiomarkr).
 
-
-
+&nbsp;
 
 ### Implementation
 
-QDiabetes-Heart Failure (2015) and QRISK2 (2017) 
+
 
 
 ## Outcome variable definitions
