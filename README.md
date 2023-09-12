@@ -37,6 +37,8 @@ The following table provides a brief overview of how we have defined the variabl
 | SBP | Both | Read code list (one code only) | Medcode list (includes their one SBP Read code), only including if valid/missing numunitid |
 | BMI | Both | Read code list (one code only) | Medcode list (includes their one BMI Read code), only including if valid/missing numunitid |
 
+&nbsp;
+
 Additional: QRISK3 paper states that for SBP, BMI, and smoking status, the most recent values before baseline were used. For cholesterol:HDL ratio, the most recent before or after baseline was used as long as it was before CVD diagnosis/censoring/statins. QDHF paper states that for continuous variables, the closest values prior to baseline or within 6 months after were used. We have used the most recent value prior to baseline (maximum of two years earlier, or 6 months for HbA1c) or up to 7 days after if closer.
 
 &nbsp;
