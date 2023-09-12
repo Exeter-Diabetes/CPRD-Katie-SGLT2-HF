@@ -45,13 +45,25 @@ Additional: QRISK3 paper states that for SBP, BMI, and smoking status, the most 
 
 ### Algorithm coding
 
-Code for implementing the QDiabetes-Heart Failure 2015 and QRISK2 2017 algorithms were adapted from the open source software available on their respective websites (QDHF: https://qdiabetes.org/index.php; QRISK2 no longer available) and are included in the [EHRBiomarkr R package](https://github.com/Exeter-Diabetes/EHRBiomarkr).
+Code for implementing the QDiabetes-Heart Failure 2015 and QRISK2 2017 algorithms was adapted from the open source software available on their respective websites (QDHF: https://qdiabetes.org/index.php; QRISK2 no longer available) and are included in the [EHRBiomarkr R package](https://github.com/Exeter-Diabetes/EHRBiomarkr).
 
 &nbsp;
 
 ### Implementation
 
+Those with biomarker values outside the range used by the online versions of the QDiabetes-Heart Failure 2015 and QRISK2 2017 calculators were excluded. The ranges were:
+*	QDHF:
+** Cholesterol:HDL ratio: missing or 1-11
+** HbA1c: 40-150 mmol/mol
+** SBP: missing or 70-210 mmHg
+** Age: 25-84 years
+** Also excluded if BMI<20 kg/m2 as very different from development cohort
+* QRISK2:
+** Cholesterol:HDL ratio: missing or 1-12
+** SBP: missing or 70-210 mmHg
+** Age: 25-84 years
+** Also exclude if BMI<20 kg/m2 as very different from development cohort
 
-
+&nbsp;
 
 ## Outcome variable definitions
