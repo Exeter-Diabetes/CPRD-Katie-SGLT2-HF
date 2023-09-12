@@ -15,6 +15,7 @@ QRISK2 2013 codelists: https://qrisk.org/QRISK2-2013-Code-Lists.pdf (link no lon
 The following table provides a brief overview of how we have defined the variables for these risk scores in CPRD, and how this might differ to the variable definition used to validate these risk scores / the way in which QRISK2 has previously been automatically run on GP systems in the UK (information from papers and QRISK 2013 codelists as linked above). All codelists are available here: https://github.com/Exeter-Diabetes/CPRD-Codelists/.
 
 | Variable | Which risk scores | How this was defined during validation / for QRISK2 in automatic GP systems | How we have defined it |
+| --- | --- | --- | --- |
 | Age | Both | N/A | Age from DOB; [DOB definition](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/main/readme.md#general-notes-on-implementation) |
 | Sex | Both | N/A | Provided by CPRD |
 | Ethnicity | Both | UK census Read codes, no details on how conflicting codes dealt with | Medcode codelist (includes all of QRISK2 Read codes + extras); hospital (HES) ethnicity used if GP missing; and our algorithm if conflicting codes are present as per [our algorithm](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/main/readme.md#ethnicity). Some missingness |
