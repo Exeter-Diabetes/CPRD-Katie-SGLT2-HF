@@ -55,10 +55,9 @@ Those with biomarker values outside the range used by the online versions of the
 
 * QDHF:
     *	Cholesterol:HDL ratio: missing or 1-11
-    * test	
     * HbA1c: 40-150 mmol/mol
     * SBP: missing or 70-210 mmHg
-       Age: 25-84 years
+    * Age: 25-84 years
     * Also excluded if BMI<20 kg/m2 as very different from development cohort
 * QRISK2:
   * Cholesterol:HDL ratio: missing or 1-12
