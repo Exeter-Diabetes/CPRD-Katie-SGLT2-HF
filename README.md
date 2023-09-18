@@ -8,12 +8,12 @@
 
 | Protocol component | Target trial protocol | Emulation |
 | --- | --- | --- |
-| Eligibility criteria | <b>Inclusion:<\b> Patients with T2D, aged >=18 years, with no history of CVD, CKD (stage 3a-5) or HF (as separate guidance exists for some groups| |
-| Treatment assignment | | |
-| Treatment initiation | | |
-| Treatment strategy | | |
-Follow-up
-Outcomes
+| Eligibility criteria | <b>Inclusion:<b> Patients with T2D, aged >=18 years treated with antihyperglycaemic medication (those receiving non-MFN as first line therapy are weird).<br><b>Exclusion<B>: History of CVD, CKD (stage 3a-5) or HF (as separate guidance/contraindications exist for some groups).<br>Current insulin treatment (as indicates advanced diabetes). | <b>Inclusion:<b> Patients with T2D, aged >=18 years treated with antihyperglycaemic medication.<br><b>Exclusion<B>: History of CVD, CKD (stage 3a-5) or HF (as separate guidance/contraindications exist for some groups)<br>Current insulin treatment. |
+| Treatment assignment | Participants randomly assigned to SGLT2i or placebo | Emulate random assignment to SGLT2i or SU (no evidence of CVD effect) using:<br>* IPTW<br>* Propensity score matching<br>*Regression adjustment<br>Sense check will be comparing DPP4 (third arm) to SU |
+| Treatment initiation | Initiation of SGLT2i or placebo (and no concurrent treatment initiations) | Initiation of SGLT2i or SU (and no concurrent treatment initiations). Initiation no earlier than 01/01/2013 as this is when SGLT2is began being prescribed in UK. At least 91 days of pre-iniiatin data available so we know this is an initiation (can do sensitivity analysis with more data as per other papers). Patients can be in both arms at different times - unlike target trial. |
+| Treatment strategy | Given medication as part of trial. Further additional treatment with DPP4, SU, MFN, Glinide (not TZD, SGLT2i, GLP1 [due to CVD effects] or insulin [due to exclusion]) after the treatment initiation period is allowed as needed. | Prescription recorded in primary care records - we cannot be sure patient took all medication. Assume stopped if gap of 6 months or more. Further additional treatment with DPP4, SU, MFN, Glinide (not TZD, SGLT2i, GLP1 [due to CVD effects] or insulin [due to exclusion]) after the treatment initiation period is allowed as needed. |
+Follow-up | Starts at treatment initiation. For ITT ends up to 5 years after initiation or if experience outcome. Censor if lost to follow up or death | Starts at treatment initiation. For ITT ends up to 5 years after initiation or if experience outcome. Censor if end of GP records (deregistration), or start TZD/SGLT2i/GLP1/insulin, or death.
+Outcomes | HF: new onset HF<br>CVD: New onset 3-point MACE | HF: any recording of HF in GP/HES/ONS (death) data<br>CVD: any recording of MI (broader ICD10 [HES] codelist including history/complications) or stroke (broader ICD10 [HES] codelist including history/complications) in GP/HES data, or CV death in ONS data.<br><br>Sensitivity analysis:<br>HF: HF as primary reason for hospitalisation in HES or primary death cause in ONS data<br>CVD: MI/stroke (narrower ICD10 [HES] codelists) as primary reason for hospitalisation in HES or CV death as primary cause of death in ONS data. |
 Causal contrasts of interest
 Analysis plan to estimate causal contrasts of interest
 
