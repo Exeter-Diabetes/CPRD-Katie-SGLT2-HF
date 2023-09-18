@@ -4,6 +4,21 @@
 
 &nbsp;
 
+## Target trial specification
+
+| Protocol component | Target trial protocol | Emulation |
+| --- | --- | --- |
+| Eligibility criteria | <b>Inclusion:<\b> Patients with T2D, aged >=18 years, with no history of CVD, CKD (stage 3a-5) or HF (as separate guidance exists for some groups| |
+| Treatment assignment | | |
+| Treatment initiation | | |
+| Treatment strategy | | |
+Follow-up
+Outcomes
+Causal contrasts of interest
+Analysis plan to estimate causal contrasts of interest
+
+&nbsp;
+
 ## Risk score (QDiabetes-Heart Failure [QDHF] 2015 and QRISK2 2017) information
 
 QDiabetes-Heart Failure paper: https://bmjopen.bmj.com/content/5/9/e008503
