@@ -8,7 +8,6 @@
 
 # Unadjusted and adjusted for age + sex + duration + IMD + QRisk(5yr) + drugline + ncurrtx (adding ethnicity makes ~no difference)
 
-# Not including GLP1 currently
  
 ############################################################################################
 
