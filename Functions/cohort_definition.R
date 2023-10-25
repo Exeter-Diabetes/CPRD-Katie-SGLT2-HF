@@ -53,7 +53,7 @@ define_cohort <- function(cohort_dataset, all_drug_periods_dataset) {
   
   # Remove if HF before index date (k above)
   cohort <- cohort %>%
-    mutate(predrug_heartfailure==0)
+    filter(predrug_heartfailure==0)
   
 
   # Remove if CKD before index date (l above)
