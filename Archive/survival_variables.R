@@ -12,6 +12,7 @@
 # Sensitivity analysis:
 ## 'narrow_mace': hospitalisation for incident MI (subset of HES codes), incident stroke (subset of HES codes, includes ischaemic only), CV death - all as primary cause for hospitalisation/death only
 ## 'narrow_hf': hospitalisation or death with HF as primary cause
+## '{outcome}_pp': all of main analysis but per-protocol rather than intention to treat
 
 
 add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
@@ -26,10 +27,17 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
                          death_date,
                          next_tzd_start,
                          next_glp1_start,
-                         if_else(drugclass!="SGLT2", next_sglt2_start, as.Date("2050-01-01")),
-                         if_else(drugclass!="DPP4", next_dpp4_start, as.Date("2050-01-01")),
-                         if_else(drugclass!="SU", next_su_start, as.Date("2050-01-01")),
+                         if_else(studydrug!="SGLT2", next_sglt2_start, as.Date("2050-01-01")),
                          na.rm=TRUE),
+           
+           cens_pp=pmin(dstartdate+(365.25*5),
+                        gp_record_end,
+                        death_date,
+                        next_tzd_start,
+                        next_glp1_start,
+                        if_else(studydrug!="SGLT2", next_sglt2_start, as.Date("2050-01-01")),
+                        dstopdate+183,
+                        na.rm=TRUE),
            
            mace_outcome=pmin(postdrug_first_myocardialinfarction,
                              postdrug_first_stroke,
@@ -76,7 +84,8 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
  
   else {
     
-    sensitivity_outcomes <- c("narrow_mace", "narrow_hf")
+    # Split by whether ITT or PP
+    sensitivity_outcomes <- list(c("narrow_mace", "narrow_hf"), c("mace_pp", "expanded_mace_pp", "hf_pp", "hosp_pp", "death_pp"))
     
     cohort <- cohort %>%
       
@@ -90,21 +99,39 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
                                     na.rm=TRUE))
     
     
-    for (i in sensitivity_outcomes) {
-      
-      outcome_var=paste0(i, "_outcome")
+    for (i in unlist(sensitivity_outcomes)) {
+
       censdate_var=paste0(i, "_censdate")
       censvar_var=paste0(i, "_censvar")
       censtime_var=paste0(i, "_censtime_yrs")
-      
+
+
+      if (i %in% sensitivity_outcomes[[1]]==TRUE) {
+        
+        outcome_var=paste0(i, "_outcome")
+        
+        cohort <- cohort %>%
+          mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_itt, na.rm=TRUE))
+        }
+
+      if (i %in% sensitivity_outcomes[[2]]==TRUE) {
+        
+        outcome_var=paste0(substr(i, 1,  nchar(i)-3), "_outcome")
+        
+        cohort <- cohort %>%
+            mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_pp, na.rm=TRUE))
+        
+                 
+      }
+
       cohort <- cohort %>%
-        mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_itt, na.rm=TRUE),
-               {{censvar_var}}:=ifelse(!is.na(!!sym(outcome_var)) & !!sym(censdate_var)==!!sym(outcome_var), 1, 0),
+        mutate({{censvar_var}}:=ifelse(!is.na(!!sym(outcome_var)) & !!sym(censdate_var)==!!sym(outcome_var), 1, 0),
                {{censtime_var}}:=as.numeric(difftime(!!sym(censdate_var), dstartdate, unit="days"))/365.25)
+
       }
 
     if (main_only==FALSE) {
-      message(paste0("survival variables for ", paste0(main_outcomes, collapse=", "), ", ", paste0(unlist(sensitivity_outcomes), collapse=", "), " added"))
+      message(paste("survival variables for", paste(main_outcomes, collapse=", "), ",", paste(unlist(sensitivity_outcomes), collapse=", "), "added"))
       }
     
     }

@@ -31,8 +31,7 @@ define_cohort <- function(cohort_dataset, all_drug_periods_dataset) {
     filter(dstartdate_age>=18 &
              (drugclass=="SGLT2" | drugclass=="DPP4" | drugclass=="SU") &
              dstartdate>=as.Date("2013-01-01") &
-             drugline_all!=1) %>%
-    mutate(studydrug=ifelse(drugclass=="SGLT2", "SGLT2", ifelse(drugclass=="SU", "SU", "DPP4")))
+             drugline_all!=1)
   
   
   # Remove if on insulin at start (i above)
@@ -40,11 +39,11 @@ define_cohort <- function(cohort_dataset, all_drug_periods_dataset) {
     filter(INS==0)
   
 
-    # Remove if on GLP1/SGLT2 (except SGLT2 arm)/TZD (i above)
+  # Remove if on GLP1/SGLT2 (except SGLT2 arm)/TZD (i above)
   cohort <- cohort %>%
     filter(GLP1==0 & TZD==0 & (drugclass=="SGLT2" | SGLT2==0))
-
   
+    
   # Remove if CVD before index date (j above)
   cohort <- cohort %>%
     mutate(predrug_cvd=ifelse(predrug_angina==1 | predrug_ihd==1 | predrug_myocardialinfarction==1 | predrug_pad==1 | predrug_revasc==1 | predrug_stroke==1 | predrug_tia==1, 1, 0)) %>%
@@ -53,7 +52,7 @@ define_cohort <- function(cohort_dataset, all_drug_periods_dataset) {
   
   # Remove if HF before index date (k above)
   cohort <- cohort %>%
-    mutate(predrug_heartfailure==0)
+    filter(predrug_heartfailure==0)
   
 
   # Remove if CKD before index date (l above)
@@ -71,79 +70,102 @@ define_cohort <- function(cohort_dataset, all_drug_periods_dataset) {
     filter(!is.na(imd2015_10))
   
 
-  ## Use all SGLT2, GLP1 + TZD starts to code up later censoring
-  ### Also get latest SGLT2 stop dates - may want to do sensitivity analysis where SU arm have to have not taken SGLT2 in the previous year (as per some papers)
+  ## Use all DPP4, GLP1, SGLT2, SU + TZD starts to code up later censoring
   
-  later_sglt2 <- cohort %>%
+  later_dpp4 <- cohort %>%
     select(patid, dstartdate) %>%
     inner_join((all_drug_periods_dataset %>%
-                  filter(drugclass=="SGLT2") %>%
-                  select(patid, next_sglt2=dstartdate)), by="patid") %>%
-    filter(next_sglt2>dstartdate) %>%
+                  filter(drugclass=="DPP4") %>%
+                  select(patid, next_dpp4=dstartdate)), by="patid") %>%
+    filter(next_dpp4>=dstartdate) %>%
     group_by(patid, dstartdate) %>%
-    summarise(next_sglt2_start=min(next_sglt2, na.rm=TRUE)) %>%
+    summarise(next_dpp4_start=min(next_dpp4, na.rm=TRUE)) %>%
     ungroup()
-  
   
   later_glp1 <- cohort %>%
     select(patid, dstartdate) %>%
     inner_join((all_drug_periods_dataset %>%
                   filter(drugclass=="GLP1") %>%
                   select(patid, next_glp1=dstartdate)), by="patid") %>%
-    filter(next_glp1>dstartdate) %>%
+    filter(next_glp1>=dstartdate) %>%
     group_by(patid, dstartdate) %>%
     summarise(next_glp1_start=min(next_glp1, na.rm=TRUE)) %>%
     ungroup()
   
+  later_sglt2 <- cohort %>%
+    select(patid, dstartdate) %>%
+    inner_join((all_drug_periods_dataset %>%
+                  filter(drugclass=="SGLT2") %>%
+                  select(patid, next_sglt2=dstartdate)), by="patid") %>%
+    filter(next_sglt2>=dstartdate) %>%
+    group_by(patid, dstartdate) %>%
+    summarise(next_sglt2_start=min(next_sglt2, na.rm=TRUE)) %>%
+    ungroup()
   
+  later_su <- cohort %>%
+    select(patid, dstartdate) %>%
+    inner_join((all_drug_periods_dataset %>%
+                  filter(drugclass=="SU") %>%
+                  select(patid, next_su=dstartdate)), by="patid") %>%
+    filter(next_su>=dstartdate) %>%
+    group_by(patid, dstartdate) %>%
+    summarise(next_su_start=min(next_su, na.rm=TRUE)) %>%
+    ungroup()
+  
+
   later_tzd <- cohort %>%
     select(patid, dstartdate) %>%
     inner_join((all_drug_periods_dataset %>%
                   filter(drugclass=="TZD") %>%
                   select(patid, next_tzd=dstartdate)), by="patid") %>%
-    filter(next_tzd>dstartdate) %>%
+    filter(next_tzd>=dstartdate) %>%
     group_by(patid, dstartdate) %>%
     summarise(next_tzd_start=min(next_tzd, na.rm=TRUE)) %>%
     ungroup()
-  
-  
-  last_sglt2_stop <- cohort %>%
-    select(patid, dstartdate) %>%
-    inner_join((all_drug_periods_dataset %>%
-                  filter(drugclass=="SGLT2") %>%
-                  select(patid, last_sglt2=dstopdate)), by="patid") %>%
-    filter(last_sglt2<dstartdate) %>%
-    group_by(patid, dstartdate) %>%
-    summarise(last_sglt2_stop=min(last_sglt2, na.rm=TRUE)) %>%
-    ungroup()
-  
 
     cohort <- cohort %>%
-    left_join(later_sglt2, by=c("patid", "dstartdate")) %>%
-    left_join(later_glp1, by=c("patid", "dstartdate")) %>%
-    left_join(later_tzd, by=c("patid", "dstartdate")) %>%
-    left_join(last_sglt2_stop, by=c("patid", "dstartdate"))
+      left_join(later_dpp4, by=c("patid", "dstartdate")) %>%
+      left_join(later_glp1, by=c("patid", "dstartdate")) %>%
+      left_join(later_sglt2, by=c("patid", "dstartdate")) %>%
+      left_join(later_su, by=c("patid", "dstartdate")) %>%
+      left_join(later_tzd, by=c("patid", "dstartdate"))
   
   
-  # Tidy up gender, ncurrtx, drugline and ethnicity variables
+  # Tidy up variables needed for adjustment/weighting
   ## Also code up death cause variables
   
   cohort <- cohort %>%
     
     mutate(malesex=ifelse(gender==1, 1, 0),
-           
-           ncurrtx=DPP4+GLP1+MFN+SU+SGLT2+TZD+INS,          #INS, GLP1 and TZD should be 0 but include anyway; ignore Acarbose and Glinide
+           ethnicity_qrisk2_decoded=case_when(is.na(ethnicity_qrisk2) ~"missing",
+                                              ethnicity_qrisk2==1 ~"White",
+                                              ethnicity_qrisk2==2 ~"Indian",
+                                              ethnicity_qrisk2==3 ~"Pakistani",
+                                              ethnicity_qrisk2==4 ~"Bangladeshi",
+                                              ethnicity_qrisk2==5 ~"Other Asian",
+                                              ethnicity_qrisk2==6 ~"Black Caribbean",
+                                              ethnicity_qrisk2==7 ~"Black African",
+                                              ethnicity_qrisk2==8 ~"Chinese",
+                                              ethnicity_qrisk2==9 ~"Other"),
+           imd2015_10=as.factor(imd2015_10),
+           qrisk2_smoking_cat=as.factor(qrisk2_smoking_cat),
            
            drugline_all=as.factor(ifelse(drugline_all>=5, 5, drugline_all)),
+           ncurrtx=as.factor(DPP4+GLP1+MFN+SU+SGLT2+TZD+INS),          #INS, GLP1 and TZD should be 0 but include anyway; ignore Acarbose and Glinide
+           initiation_year=as.factor(format(dstartdate,"%Y")),
            
-           drugsubstances=ifelse(grepl("&", drugsubstances), NA, drugsubstances),
+           statin_last_6_months=ifelse(!is.na(predrug_latest_statins) & as.numeric(difftime(dstartdate, predrug_latest_statins, unit="days"))<=183, 1, 0),
+           acei_last_6_months=ifelse(!is.na(predrug_latest_ace_inhibitors) & as.numeric(difftime(dstartdate, predrug_latest_ace_inhibitors, unit="days"))<=183, 1, 0),
+           arb_last_6_months=ifelse(!is.na(predrug_latest_arb) & as.numeric(difftime(dstartdate, predrug_latest_arb, unit="days"))<=183, 1, 0),
+           bb_last_6_months=ifelse(!is.na(predrug_latest_beta_blockers) & as.numeric(difftime(dstartdate, predrug_latest_beta_blockers, unit="days"))<=183, 1, 0),
+           ccb_last_6_months=ifelse(!is.na(predrug_latest_calcium_channel_blockers) & as.numeric(difftime(dstartdate, predrug_latest_calcium_channel_blockers, unit="days"))<=183, 1, 0),
+           thiazide_diuretics_last_6_months=ifelse(!is.na(predrug_latest_thiazide_diuretics) & as.numeric(difftime(dstartdate, predrug_latest_thiazide_diuretics, unit="days"))<=183, 1, 0),
+           loop_diuretics_last_6_months=ifelse(!is.na(predrug_latest_loop_diuretics) & as.numeric(difftime(dstartdate, predrug_latest_loop_diuretics, unit="days"))<=183, 1, 0),
+           ksparing_diuretics_last_6_months=ifelse(!is.na(predrug_latest_ksparing_diuretics) & as.numeric(difftime(dstartdate, predrug_latest_ksparing_diuretics, unit="days"))<=183, 1, 0),
            
-           ethnicity_5cat_decoded=case_when(ethnicity_5cat==0 ~"White",
-                                            ethnicity_5cat==1 ~"South Asian",
-                                            ethnicity_5cat==2 ~"Black",
-                                            ethnicity_5cat==3 ~"Other",
-                                            ethnicity_5cat==4 ~"Mixed"),
-           
+           hosp_admission_prev_year=as.factor(hosp_admission_prev_year),
+           hosp_admission_prev_year_count=as.factor(ifelse(hosp_admission_prev_year_count==0, 0,
+                                                           ifelse(hosp_admission_prev_year_count<=2, 1, 2))),
            cv_death_date_any_cause=if_else(!is.na(death_date) & !is.na(cv_death_any_cause) & cv_death_any_cause==1, death_date, as.Date(NA)),
            cv_death_date_primary_cause=if_else(!is.na(death_date) & !is.na(cv_death_primary_cause) & cv_death_primary_cause==1, death_date, as.Date(NA)),
            hf_death_date_any_cause=if_else(!is.na(death_date) & !is.na(hf_death_any_cause) & hf_death_any_cause==1, death_date, as.Date(NA)),
