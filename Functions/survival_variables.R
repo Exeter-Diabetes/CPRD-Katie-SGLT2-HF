@@ -27,8 +27,8 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
                          next_tzd_start,
                          next_glp1_start,
                          if_else(drugclass!="SGLT2", next_sglt2_start, as.Date("2050-01-01")),
-                         if_else(drugclass!="DPP4", next_dpp4_start, as.Date("2050-01-01")),
-                         if_else(drugclass!="SU", next_su_start, as.Date("2050-01-01")),
+                         if_else(drugclass!="DPP4", dpp4_start_later, as.Date("2050-01-01")),
+                         if_else(drugclass!="SU", su_start_later, as.Date("2050-01-01")),
                          na.rm=TRUE),
            
            mace_outcome=pmin(postdrug_first_myocardialinfarction,
@@ -47,7 +47,7 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
                            hf_death_date_any_cause,
                            na.rm=TRUE),
            
-           hosp_outcome=postdrug_first_all_cause_hosp,
+           hosp_outcome=postdrug_first_emergency_hosp,
            
            death_outcome=death_date)
   
@@ -80,14 +80,32 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
     
     cohort <- cohort %>%
       
-      mutate(narrow_mace_outcome=pmin(postdrug_first_incident_mi,
+      mutate(cens_itt_can_overlap=pmin(dstartdate+(365.25*5),
+                                       gp_record_end,
+                                       death_date,
+                                       next_tzd_start,
+                                       next_glp1_start,
+                                       if_else(drugclass!="SGLT2", next_sglt2_start, as.Date("2050-01-01")),
+                                       if_else(drugclass=="SGLT2", dpp4_start_later, as.Date("2050-01-01")),
+                                       if_else(drugclass=="SGLT2", su_start_later, as.Date("2050-01-01")),
+                                       na.rm=TRUE),
+             
+             narrow_mace_outcome=pmin(postdrug_first_incident_mi,
                                       postdrug_first_incident_stroke,
                                       cv_death_date_primary_cause,
                                       na.rm=TRUE),
              
              narrow_hf_outcome=pmin(postdrug_first_primary_hhf,
                                     hf_death_date_primary_cause,
-                                    na.rm=TRUE))
+                                    na.rm=TRUE),
+             
+             hf_can_overlap_censdate=pmin(hf_outcome, cens_itt_can_overlap, na.rm=TRUE),
+             hf_can_overlap_censvar=ifelse(!is.na(hf_outcome) & hf_can_overlap_censdate==hf_outcome, 1, 0),
+             hf_can_overlap_censtime_yrs=as.numeric(difftime(hf_can_overlap_censdate, dstartdate, unit="days"))/365.25,
+             
+             mace_can_overlap_censdate=pmin(mace_outcome, cens_itt_can_overlap, na.rm=TRUE),
+             mace_can_overlap_censvar=ifelse(!is.na(mace_outcome) & mace_can_overlap_censdate==mace_outcome, 1, 0),
+             mace_can_overlap_censtime_yrs=as.numeric(difftime(mace_can_overlap_censdate, dstartdate, unit="days"))/365.25)
     
     
     for (i in sensitivity_outcomes) {
