@@ -24,11 +24,11 @@ rm(list=ls())
 
 # 1 Cohort selection (see script 00)
 
-setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
+setwd("/slade/CPRD_data/Katie SGLT2/Processed data")
 load("treatment_outcome_cohort_jun24.rda")
 
 # Add survival variables
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions")
 source("survival_variables.R")
 
 cohort <- add_surv_vars(cohort, main_only=T)
@@ -51,25 +51,26 @@ cohort <- cohort %>%
 
 ############################################################################################
 
-# 3 Histogram of predicted benefits
+# 3 Histogram of predicted benefits (not truncated)
 
-# setwd("/slade/CPRD_data/Katie SGLT2/Processed data/Plots/")
-# tiff("histogram_benefits.tiff", width=7, height=4, units = "in", res=800) 
-# 
-# ggplot(cohort, aes(x=qdhf_sglt2_benefit*100)) + 
-#   geom_histogram(aes(y = after_stat(count / sum(count))*100), binwidth=0.05, alpha=0.5, position="identity") +
-#   ylab("Proportion of study population (%)") + xlab("Predicted 5-year SGLT2i benefit (%)") +
-#   scale_x_continuous(limits=c(0,4.5),breaks=c(seq(0,4.5,by=1))) +
-#   scale_y_continuous(limits=c(0,4),breaks=c(seq(0, 4, by=1))) +
-#   theme_base() + 
-#   theme(plot.background = element_blank())
-# 
-# dev.off()  
-
-#range
 summary(cohort$qdhf_sglt2_benefit*100)
 # Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 # 0.02814  0.55854  1.00996  1.36487  1.79742 14.09242 
+
+# setwd("/slade/CPRD_data/Katie SGLT2/Plots/")
+# tiff("histogram_benefits.tiff", width=9, height=5, units = "in", res=800)
+# 
+# ggplot(cohort, aes(x=qdhf_sglt2_benefit*100)) +
+#   geom_histogram(aes(y = after_stat(count / sum(count))*100), binwidth=0.1, alpha=0.5, position="identity") +
+#   ylab("Proportion of study population (%)") + xlab("Predicted 5-year SGLT2i benefit (%)") +
+#   scale_x_continuous(limits=c(0,15),breaks=c(seq(0,15,by=1))) +
+#   scale_y_continuous(limits=c(0,7),breaks=c(seq(0, 7, by=1))) +
+#   theme_base() +
+#   theme(plot.background = element_blank(),
+#         panel.border=element_blank())
+# 
+# dev.off()
+
 
 
 ############################################################################################
@@ -101,7 +102,7 @@ overlap <- SumStat(ps.formula=ps.formula, data=as.data.frame(cohort), weight="ov
 cohort$overlap_weights <- overlap$ps.weights$overlap
 
 # Remove constant variables otherwise datadist has issues
-cohort <- cohort %>% select(patid, studydrug, qdiabeteshf_5yr_score, dstartdate_age, ethnicity_qrisk2_decoded, malesex, dstartdate_dm_dur_all, imd2015_10, drugline_all, ncurrtx_cat, INS, initiation_year, prebmi, prehba1c2yrs, presbp, qrisk2_smoking_cat, hypertension, hosp_admission_prev_year_count, hf_censtime_yrs, hf_censvar, overlap_weights, predicted_benefit_decile, predrug_af)
+cohort <- cohort %>% select(patid, studydrug, qdiabeteshf_5yr_score, dstartdate_age, ethnicity_qrisk2_decoded, malesex, dstartdate_dm_dur_all, imd2015_10, drugline_all, ncurrtx_cat, INS, initiation_year, prebmi, prehba1c2yrs, presbp, qrisk2_smoking_cat, hypertension, hosp_admission_prev_year_count, hf_censtime_yrs, hf_censvar, overlap_weights, qdhf_sglt2_benefit, predicted_benefit_decile, predrug_af)
 
 ddist <- datadist(cohort)
 options(datadist='ddist')
@@ -127,6 +128,12 @@ obs <- cohort %>%
     l_iqr=quantile(obs,0.25,na.rm=T),
     u_iqr=quantile(obs,0.75,na.rm=T)
   )
+
+
+predicted.p <- predicted %>% 
+  mutate(pred=pred.median*100) %>%
+  select(predicted_benefit_decile,pred)
+plot.data <- merge(obs,predicted.p,by="predicted_benefit_decile") 
 
 
 # ## Observed - adjusted and weighted with overlap weights, with studydrug*decile interaction - not using
@@ -164,40 +171,77 @@ obs <- cohort %>%
 # #gives exactly the same answer!!
 
 
-cohort$DPP4SU.pred <- DPP4SU.pred$surv
-cohort$SGLT2.pred <- SGLT2.pred$surv
 
-obs <- cohort %>%
-  mutate(obs=(SGLT2.pred-DPP4SU.pred)*100) %>%
-  group_by(predicted_benefit_decile) %>%
-  dplyr::summarise(
-    obs.gp = median(obs,na.rm=T),
-    l_iqr=quantile(obs,0.25,na.rm=T),
-    u_iqr=quantile(obs,0.75,na.rm=T)
-  )
+# Overall estimates
 
+summary((cohort %>% mutate(obs=(SGLT2.pred-DPP4SU.pred)*100))$obs)
+# Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+# 0.02795  0.50804  0.89648  1.30174  1.61432 13.13283 
 
-predicted.p <- predicted %>% 
-  mutate(pred=pred.median*100) %>%
-  select(predicted_benefit_decile,pred)
-plot.data <- merge(obs,predicted.p,by="predicted_benefit_decile") 
+summary(cohort$qdhf_sglt2_benefit*100)
+# Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+# 0.02814  0.55854  1.00996  1.36487  1.79742 14.09242 
 
 
-setwd("/slade/CPRD_data/Katie SGLT2/Processed data/Plots/")
-tiff("calibration_benefits_no_interaction.tiff", width=7, height=6, units = "in", res=800) 
 
-ggplot(data=plot.data,aes(x=pred,y=obs.gp)) +
+
+cal_plot <- ggplot(data=plot.data, aes(x=pred,y=obs.gp)) +
   geom_point(alpha=1) + theme_bw() +
   geom_errorbar(aes(ymin=l_iqr, ymax=u_iqr), colour="black", width=.1) +
   ylab("Observed 5-year SGLT2i benefit (%)") + xlab("Predicted 5-year SGLT2i benefit (%)") +
   scale_x_continuous(limits=c(0,4.5),breaks=c(seq(0,4.5,by=1))) +
-  scale_y_continuous(limits=c(0,5.5),breaks=c(seq(0,5.5,by=1))) +
+  scale_y_continuous(limits=c(0,5),breaks=c(seq(0,5,by=1))) +
   theme_base() + 
-  theme(plot.background = element_blank()) +
+  theme_bw() +
+  theme(text = element_text(size = 18),
+        axis.line = element_line(colour =  "grey50" ),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        #plot.margin = unit(c(0.5, 0, 0, 0), "cm"),
+        legend.position = "none") +
   geom_abline(intercept=0,slope=1, color="red", lwd=0.75) + ggtitle("") +
   geom_vline(xintercept=0, linetype="dashed", color = "grey60") + geom_hline(yintercept=0, linetype="dashed", color = "grey60")
 
+
+cal_plot <- cal_plot +
+  annotate(geom="text", x=0.1, y=4.8, label="Overall median observed benefit (IQR): 0.90% (0.51-1.6%)\nOverall median predicted benefit: 1.0%", color="black", hjust=0, size = 5)
+
+
+hist_plot <- ggplot(cohort, aes(x=qdhf_sglt2_benefit*100)) +
+  geom_histogram(aes(y = after_stat(count / sum(count))*100), binwidth=0.1, alpha=0.5, position="identity") +
+  guides(fill = FALSE) +
+  theme(legend.title = element_blank(), panel.background = element_rect( fill = "white",color = "grey50")) +
+  scale_x_continuous(limits=c(0,4.5),breaks=c(seq(0,4.5,by=1))) +
+  xlab(expression(paste("Predicted 5-year SGLT2i benefit (%)"))) +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line.x = element_line(color="grey50"),
+        text = element_text(size = 18),
+        plot.margin = unit(c(0.3, 0, 0, 0), "cm"))
+
+
+
+
+setwd("/slade/CPRD_data/Katie SGLT2/Plots/")
+tiff("calibration_benefits_no_interaction.tiff", width=8, height=8, units = "in", res=800) 
+
+plot_grid(cal_plot, hist_plot, ncol = 1,align = 'v',
+          rel_heights = c(1,0.5), rel_widths = c(1,1))
+
 dev.off()  
+
+
+
+
 
 
 
@@ -246,7 +290,7 @@ dev.off()
 # plot.data <- merge(obs,predicted.p,by="predicted_benefit_decile") 
 # 
 # 
-# setwd("/slade/CPRD_data/Katie SGLT2/Processed data/Plots/")
+# setwd("/slade/CPRD_data/Katie SGLT2/Plots/")
 # tiff("calibration_benefits_qdhf_interaction.tiff", width=7, height=6, units = "in", res=800) 
 # 
 # ggplot(data=plot.data,aes(x=pred,y=obs.gp)) +

@@ -22,7 +22,7 @@ rm(list=ls())
 
 # 1 Cohort selection and variable setup
 
-setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
+setwd("/slade/CPRD_data/Katie SGLT2/Processed data")
 load("treatment_outcome_cohort_jun24.rda")
 #169,041
 
@@ -33,7 +33,7 @@ table(cohort$studydrug)
 
 ## B Make variables for survival analysis of all endpoints (see survival_variables function for details)
 
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions")
 source("survival_variables.R")
 
 cohort <- add_surv_vars(cohort, main_only=TRUE)
@@ -76,47 +76,11 @@ events_table <- t(dpp4su %>%
 
 
 obs_v_pred <- cbind(predicted, observed) %>%
-  select(qdhf_decile, mean_qdhf_pred, observed, lower_ci, upper_ci)
-
-dodge <- position_dodge(width=0.3)
-
-tiff("../../Plots/QDHF_mean.tiff", width=6, height=5.5, units = "in", res=800) 
-
-ggplot(data=obs_v_pred, aes(x=qdhf_decile)) +
-  geom_point(aes(y = observed*100, color="observed", shape="observed"), size=3, position=dodge) +
-  geom_errorbar(aes(ymax=upper_ci*100, ymin=lower_ci*100),width=0.25,size=1, position=dodge) +
-  geom_point(aes(y = mean_qdhf_pred*100, color="mean_qdhf_pred", shape="mean_qdhf_pred"), position=dodge, stroke=1.5, size=4) +
-  theme_bw() +
-  xlab("Predicted 5-year absolute HF risk decile") + ylab("5-year HF risk (%)")+
-  scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-  scale_y_continuous(breaks=c(seq(0,20,by=5)), limits=c(0,21)) +
-  theme(panel.border=element_blank(),
-        panel.grid.major=element_blank(),
-        panel.grid.minor=element_blank(),
-        axis.line.x=element_line(colour = "black"),
-        axis.line.y=element_line(colour="black"),
-        plot.title = element_text(size = rel(1.5), face = "bold"),
-        plot.margin = margin(10,10,10,10),
-        axis.text=element_text(size=rel(1.5)),
-        axis.title=element_text(size=rel(1.5)),
-        legend.position=c(0.4, 0.9),
-        legend.text=element_text(size=16)) +
-  scale_color_manual(values = c(observed = "black", mean_qdhf_pred = "black"), labels = c(observed = "Observed (with 95% CI)", mean_qdhf_pred = "Mean predicted risk per decile"), name="") +
-  scale_shape_manual(values = c(observed = 16, mean_qdhf_pred = 4), labels = c(observed = "Observed (with 95% CI)", mean_qdhf_pred = "Mean predicted risk per decile"), name="") #+
-#ggtitle("5-year QDiabetes-Heart Failure vs heart failure incidence")
-
-dev.off()  
-
-
-
-
-
-obs_v_pred <- cbind(predicted, observed) %>%
   select(qdhf_decile, median_qdhf_pred, observed, lower_ci, upper_ci)
 
 dodge <- position_dodge(width=0.3)
 
-tiff("../../Plots/QDHF_median.tiff", width=6, height=5.5, units = "in", res=800) 
+tiff("../../Plots/QDHF_median.tiff", width=9, height=7, units = "in", res=800) 
 
 ggplot(data=obs_v_pred, aes(x=qdhf_decile)) +
   geom_point(aes(y = observed*100, color="observed", shape="observed"), size=3, position=dodge) +
@@ -125,7 +89,7 @@ ggplot(data=obs_v_pred, aes(x=qdhf_decile)) +
   theme_bw() +
   xlab("Predicted 5-year absolute HF risk decile") + ylab("5-year HF risk (%)")+
   scale_x_continuous(breaks=c(seq(0,10,by=1)))+
-  scale_y_continuous(breaks=c(seq(0,20,by=5)), limits=c(0,21)) +
+  scale_y_continuous(breaks=c(seq(0,14,by=2)), limits=c(0,14)) +
   theme(panel.border=element_blank(),
         panel.grid.major=element_blank(),
         panel.grid.minor=element_blank(),
@@ -139,7 +103,7 @@ ggplot(data=obs_v_pred, aes(x=qdhf_decile)) +
         legend.text=element_text(size=16)) +
   scale_color_manual(values = c(observed = "black", median_qdhf_pred = "black"), labels = c(observed = "Observed (with 95% CI)", median_qdhf_pred = "Median predicted risk per decile"), name="") +
   scale_shape_manual(values = c(observed = 16, median_qdhf_pred = 4), labels = c(observed = "Observed (with 95% CI)", median_qdhf_pred = "Median predicted risk per decile"), name="") #+
-  #ggtitle("5-year QDiabetes-Heart Failure vs heart failure incidence")
+#ggtitle("5-year QDiabetes-Heart Failure vs heart failure incidence")
 
 dev.off()  
 
