@@ -2,22 +2,7 @@
 
 ## Introduction
 
-This repository contains the R code for 'Precision prescribing of SGLT2-inhibitors in people with type 2 diabetes for primary prevention of heart failure' (link to be added).
-
-&nbsp;
-
-## Target trial specification
-
-| Protocol component | Target trial protocol | Emulation |
-| --- | --- | --- |
-| Eligibility criteria | **Inclusion:** Patients with T2D, aged >=18 years treated with antihyperglycaemic medication (those receiving non-MFN as first line therapy are weird).<br>**Exclusion**: History of CVD, CKD (stage 3a-5) or HF (as separate guidance/contraindications exist for some groups).<br>Current insulin treatment (as indicates advanced diabetes).<br>Prior use of SGLT2i.<br>Sensitivity analysis: only those on MFN and no prior use of second-line therapies (ever/in previous year as per Lancet paper?) | **Inclusion:** Patients with T2D, aged >=18 years treated with antihyperglycaemic medication.<br>**Exclusion**: History of CVD, CKD (stage 3a-5) or HF (as separate guidance/contraindications exist for some groups)<br>Current insulin treatment.<br>Prior use of SGLT2i or SU (although we don't have complete records for everyone going back to diagnosis, but have to assume number who go off and then back on drug is small)<br>Sensitivity analysis: only those on MFN and no prior use of second-line therapies (ever/in previous year as per Lancet paper?) |
-| Treatment assignment | Participants randomly assigned to SGLT2i or placebo | Emulate random assignment to SGLT2i or SU (no evidence of CVD effect) using:<br>* Overlap weighting<br>* IPTW<br>* Propensity score matching<br>*Regression adjustment<br>Sense check will be comparing DPP4 (third arm) to SU |
-| Treatment initiation | Initiation of SGLT2i or placebo (and no concurrent treatment initiations) | Initiation of SGLT2i or SU (and no concurrent treatment initiations). Initiation no earlier than 01/01/2013 as this is when SGLT2is began being prescribed in UK. At least 90 days of pre-initiation data available so we know this is an initiation (can do sensitivity analysis with more data as per other papers). Patients can be in both arms at different times - unlike target trial. |
-| Treatment strategy | Given medication as part of trial. Further additional treatment with DPP4, SU, MFN, Glinide (not TZD, SGLT2i, GLP1 [due to CVD effects]) after the treatment initiation period is allowed as needed. | Prescription recorded in primary care records - we cannot be sure patient took all medication. Assume stopped if gap of 6 months or more. Further additional treatment with DPP4, SU, MFN, Glinide (not TZD, SGLT2i, GLP1 [due to CVD effects] or insulin [due to exclusion]) after the treatment initiation period is allowed as needed. |
-Follow-up | Starts at treatment initiation. For ITT ends up to 5 years after initiation or if experience outcome. Censor if lost to follow up or death | Starts at treatment initiation. For ITT ends up to 5 years after initiation or if experience outcome. Censor if end of GP records (deregistration), or start TZD/SGLT2i/GLP1/insulin, or death.
-Outcomes | HF: new onset HF<br>CVD: New onset 3-point MACE | HF: any recording of HF in GP/HES/ONS (death) data<br>CVD: any recording of MI (broader ICD10 [HES] codelist including history/complications) or stroke (broader ICD10 [HES] codelist including history/complications) in GP/HES data, or CV death in ONS data.<br><br>Sensitivity analysis:<br>HF: HF as primary reason for hospitalisation in HES or primary death cause in ONS data<br>CVD: MI/stroke (narrower ICD10 [HES] codelists) as primary reason for hospitalisation in HES or CV death as primary cause of death in ONS data. Can see if broader codelists actually amke any difference |
-Causal contrasts of interest | ITT effect of SGLT2i over placebo on time to first HF / 3-point MACE | ITT effect of SGLT2i over SU on time to first HF / 3-point MACE |
-Analysis plan to estimate causal contrasts of interest | |
+This repository contains the R code for 'Precision prescribing of SGLT2-inhibitors in people with type 2 diabetes for primary prevention of heart failure' (link to be added) and detailed information on risk score and outcome variable definitions.
 
 &nbsp;
 
@@ -84,3 +69,14 @@ Those with biomarker values outside the range used by the online versions of the
 &nbsp;
 
 ## Outcome variable definitions
+
+| Outcome type | Definition | Codelists used |
+|---|---|---|
+| Primary outcome: new-onset heart failure | Earliest heart failure code in primary care (medcodes), HES data (ICD10; primary or secondary cause) or ONS death records (ICD10; primary or secondary cause) | [Medcodes](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/pre-2024/Medcodes/Comorbidities/exeter_medcodelist_heartfailure.txt)\n[ICD10](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/pre-2024/ICD10/exeter_icd10_heartfailure.txt) |
+| Secondary outcome: new-onset heart failure, 'more specific definition' | Earliest heart failure code in HES data (ICD10; primary cause only) or ONS death records (ICD10; primary cause only) | [ICD10](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/pre-2024/ICD10/exeter_icd10_heartfailure.txt) |
+| Secondary outcome: new-onset cardiovascular disease (myocardial infarction [MI], stroke, death from cardiovascular causes i.e. 3-point MACE) | Earliest code in primary care (medcodes), HES data (ICD10; primary or secondary cause) or ONS death records (ICD10; primary or secondary cause) | [MI medcodes](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/pre-2024/Medcodes/Comorbidities/exeter_medcodelist_myocardialinfarction.txt)\n[Stroke medcodes](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/pre-2024/Medcodes/Comorbidities/exeter_medcodelist_stroke.txt)\n[MI ICD10](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/pre-2024/ICD10/exeter_icd10_myocardialinfarction.txt)\n[Stroke ICD10](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/pre-2024/ICD10/exeter_icd10_stroke.txt)\n[CV death ICD10](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/pre-2024/ICD10/exeter_icd10_cv_death.txt) |
+
+
+)\n[ICD10](https://github.com/Exeter-Diabetes/CPRD-Codelists/blob/pre-2024/ICD10/exeter_icd10_heartfailure.txt) |
+
+
