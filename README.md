@@ -1,6 +1,8 @@
-# CPRD-Katie-CVD-HF
+# CPRD-Katie-SGLT2-HF
 
 ## Introduction
+
+This repository contains the R code for 'Precision prescribing of SGLT2-inhibitors in people with type 2 diabetes for primary prevention of heart failure' (link to be added).
 
 &nbsp;
 
