@@ -294,7 +294,7 @@ k -> m;
 [1]: excluded
 "
 
-setwd("/slade/CPRD_data/Katie SGLT2/Plots//")
+setwd("/slade/CPRD_data/Katie SGLT2/Plots/")
 
 DPI=800
 grViz(plot) %>%

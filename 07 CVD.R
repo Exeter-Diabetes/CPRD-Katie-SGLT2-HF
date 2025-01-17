@@ -513,7 +513,7 @@ text <- hrs_to_plot %>%
   select(analysis, DPP4SU_count, DPP4SU_ir, SGLT2_count, SGLT2_ir, mean=estimate, lower=conf.low, upper=conf.high, hr_text)
 
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots//HR_methods_CVD.tiff", width=18, height=11, units = "in", res=400) 
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/HR_methods_CVD.tiff", width=18, height=11, units = "in", res=400) 
 
 styles <- fpShapesGp(
   lines = list(

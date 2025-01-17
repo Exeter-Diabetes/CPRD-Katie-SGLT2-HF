@@ -202,10 +202,10 @@ names(survfit_list[[1]][["strata"]]) <- c("DPP4i/SU   ", "SGLT2i")
 p1 <- ggsurvplot_list(survfit_list,
                       data=new_cohort,
                       title=c(
-                        paste0("ADA/EASD: No SGLT2i (n=",round(100*(nrow(cohort_adaN)/nrow(cohort)),1),"%)"), 
-                        paste0("ADA/EASD: SGLT2i (n=",round(100*(nrow(cohort_adaY)/nrow(cohort)),1),"%)"), 
-                        paste0("Model: No SGLT2i (n=",round(100*(nrow(cohort_ada_qdhfN)/nrow(cohort)),1),"%)"),
-                        paste0("Model: SGLT2i (n=",round(100*(nrow(cohort_ada_qdhfY)/nrow(cohort)),1),"%)")),
+                        paste0("ADA/EASD: SGLT2i not\nrecommended (n=84,359 [", round(100*(nrow(cohort_adaN)/nrow(cohort)),1),"%])"), 
+                        paste0("ADA/EASD: SGLT2i\nrecommended (n=84,682 [", round(100*(nrow(cohort_adaY)/nrow(cohort)),1),"%])"), 
+                        paste0("SABRE model: SGLT2i not\nrecommended (n=145,087 [", round(100*(nrow(cohort_ada_qdhfN)/nrow(cohort)),1),"%])"),
+                        paste0("SABRE model: SGLT2i\nrecommended (n=23,954 [", round(100*(nrow(cohort_ada_qdhfY)/nrow(cohort)),1),"%])")),
                       size= 1.5,
                       fun = function(x) {100 - x*100},
                       conf.int = T,
@@ -232,7 +232,7 @@ plot <- grid.arrange(arrangeGrob(
   p1[[4]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, margin=margin(b=5, t=12), size = 18), plot.subtitle=element_text(hjust=0.2, vjust=-20, margin=margin(b=-25), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=5)), ncol=2, nrow=2, widths=c(1,1)))
 
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots//adaeasd_vs_qdhf_km_plots.tiff", width=10, height=10, units = "in", res=800)
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/adaeasd_vs_qdhf_km_plots.tiff", width=10, height=10, units = "in", res=800)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("a)", "b)"), size = 16,  x = c(0, 0), y = c(1, 0.5)) #+    
@@ -340,10 +340,10 @@ names(survfit_list[[1]][["strata"]]) <- c("DPP4i/SU   ", "SGLT2i")
 p1 <- ggsurvplot_list(survfit_list,
                       data=new_cohort,
                       title=c(
-                        paste0("ADA/EASD: No SGLT2i (n=",round(100*(nrow(cohort_adaN)/nrow(cohort)),1),"%)"), 
-                        paste0("ADA/EASD: SGLT2i (n=",round(100*(nrow(cohort_adaY)/nrow(cohort)),1),"%)"), 
-                        paste0("QRISK2: No SGLT2i (n=",round(100*(nrow(cohort_ada_qdhfN)/nrow(cohort)),1),"%)"),
-                        paste0("QRISK2: SGLT2i (n=",round(100*(nrow(cohort_ada_qdhfY)/nrow(cohort)),1),"%)")),
+                        paste0("ADA/EASD: SGLT2i not\nrecommended (n=84,359 [",round(100*(nrow(cohort_adaN)/nrow(cohort)),1),"%])"), 
+                        paste0("ADA/EASD: SGLT2i\nrecommended (n=84,682 [",round(100*(nrow(cohort_adaY)/nrow(cohort)),1),"%])"), 
+                        paste0("QRISK2: SGLT2i not\nrecommended (n=143,184 [",round(100*(nrow(cohort_ada_qdhfN)/nrow(cohort)),1),"%])"),
+                        paste0("QRISK2: SGLT2i\nrecommended (n=25,857 [",round(100*(nrow(cohort_ada_qdhfY)/nrow(cohort)),1),"%])")),
                       size= 1.5,
                       fun = function(x) {100 - x*100},
                       conf.int = T,
@@ -370,7 +370,7 @@ plot <- grid.arrange(arrangeGrob(
   p1[[4]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, margin=margin(b=5, t=12), size = 18), plot.subtitle=element_text(hjust=0.2, vjust=-20, margin=margin(b=-25), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=5)), ncol=2, nrow=2, widths=c(1,1)))
 
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots//adaeasd_vs_qrisk_km_plots.tiff", width=10, height=10, units = "in", res=800)
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/adaeasd_vs_qrisk_km_plots.tiff", width=10, height=10, units = "in", res=800)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("a)", "b)"), size = 16,  x = c(0, 0), y = c(1, 0.5)) #+    

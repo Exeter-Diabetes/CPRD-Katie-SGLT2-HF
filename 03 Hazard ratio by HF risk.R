@@ -199,3 +199,34 @@ stats::anova(model_4, model_5)
 # 1 -29963                       
 # 2 -29959 8.1717  2    0.01681 *
 #same as above
+
+
+
+
+############################################################################################
+
+# Stratified by sex
+
+males <- cohort %>% filter(malesex==1) %>% select(-malesex)
+
+ddist <- datadist(males)
+options(datadist='ddist')
+
+# sex removed
+model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~  studydrug*rcs(qdiabeteshf_5yr_score,3) + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + drugline_all + ncurrtx_cat + INS + initiation_year, data=males, x=T, y=T)
+
+anova(model)
+# no interaction - good (p=0.80)
+
+
+
+females <- cohort %>% filter(malesex==0) %>% select(-malesex)
+
+ddist <- datadist(females)
+options(datadist='ddist')
+
+# sex removed
+model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~  studydrug*rcs(qdiabeteshf_5yr_score,3) + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + drugline_all + ncurrtx_cat + INS + initiation_year, data=females, x=T, y=T)
+
+anova(model)
+# no interaction - good (p=0.17)
