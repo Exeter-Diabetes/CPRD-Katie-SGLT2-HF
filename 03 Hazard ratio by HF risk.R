@@ -126,9 +126,9 @@ spline_plot <- ggplot(data=contrast_spline_df, aes(x=qdiabeteshf_5yr_score, y=ex
 
 
 spline_plot <- spline_plot +
-  annotate(geom="text", x=3, y=2, label="Overall HR in study cohort (95% CI): 0.70 (0.63, 0.78)", color="black", hjust=0, size = 6) +
+  annotate(geom="text", x=3, y=2, label="Overall HR in study cohort (95% CI): 0.70 (0.63 to 0.78)", color="black", hjust=0, size = 6) +
   annotate(geom="text", x=3, y=1.8, label="p-value for HF risk * drug arm interaction on HF outcome: 0.82", color="black", hjust=0, size = 6) +
-  annotate(geom="text", x=3, y=1.6, label="Trial meta-analysis HR (95% CI): 0.63 (0.50, 0.80)", color="red", hjust=0, size = 6) 
+  annotate(geom="text", x=3, y=1.6, label="Trial meta-analysis HR (95% CI): 0.63 (0.50 to 0.80)", color="red", hjust=0, size = 6) 
 
 
 

@@ -183,7 +183,7 @@ adjust <- "malesex + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + ethn
 
 
 
-## Overlap and IPTW weighting
+## PS scores and adjustment for main analyses
 
 ps.formula <- formula(paste0("studydrug ~ ", weight))
 
@@ -315,7 +315,7 @@ all_hrs <- adjoverlap %>%
 
 ## Narrow MACE outcome
 
-f_adjusted <- as.formula(paste0("Surv(narrow_mace_censtime_yrs, narrow_mace_censvar) ~  studydrug  +  ", adjust))
+f_adjusted_narrow_mace <- as.formula(paste0("Surv(narrow_mace_censtime_yrs, narrow_mace_censvar) ~  studydrug  +  ", adjust))
 
 counts <- cohort %>%
   group_by(studydrug) %>%
@@ -329,7 +329,7 @@ counts <- cohort %>%
               names_glue="{studydrug}_{.value}",
               values_from=c(count, ir))
 
-adjoverlap <- coxph(f_adjusted, cohort, weights=overlap_weights) %>%
+adjoverlap <- coxph(f_adjusted_narrow_mace, cohort, weights=overlap_weights) %>%
   tidy(conf.int=TRUE, exponentiate=TRUE) %>%
   filter(term=="studydrugSGLT2") %>%
   select(estimate, conf.low, conf.high) %>%
@@ -341,6 +341,74 @@ all_counts <- all_counts %>% bind_rows(counts)
 all_hrs <- all_hrs %>% bind_rows(adjoverlap)
 
 
+## Second line therapy after MFN only
+### A) Intention to treat
+### B) Per-protocol
+
+second_line_cohort <- cohort %>% filter(drugline_all==2 & multi_drug_start==0 & MFN==1) #NB: drugline same as drugorder in this dataset as only have 1st instance of each drug class
+#64,304
+
+## need to remove drugline and ncurrtx from propensity score and adjustment
+
+ps.formula.trial <- formula(paste("studydrug ~ malesex + dstartdate_age + dstartdate_dm_dur_all + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + prebmi + prehba1c2yrs + presbp + initiation_year + qrisk2_5yr_score"))
+
+overlap <- SumStat(ps.formula=ps.formula.trial, data = as.data.frame(second_line_cohort), weight = "overlap")
+
+second_line_cohort$overlap_weights <- overlap$ps.weights$overlap
+
+## A) ITT
+
+f_adjusted_trial_itt <- as.formula(Surv(mace_itt_censtime_yrs, mace_itt_censvar) ~  studydrug  +  malesex + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + INS + initiation_year + qrisk2_5yr_score)
+
+counts <- second_line_cohort %>%
+  group_by(studydrug) %>%
+  summarise(total_count=n(),
+            event_count=sum(mace_itt_censvar),
+            total_time=sum(mace_itt_censtime_yrs),
+            count=paste0(event_count, "/", total_count),
+            ir=round_pad((event_count*1000)/total_time, 2)) %>%
+  select(-c(total_count, event_count, total_time)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_{.value}",
+              values_from=c(count, ir))
+
+adjoverlap <- coxph(f_adjusted_trial_itt, second_line_cohort, weights=overlap_weights) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  select(estimate, conf.low, conf.high) %>%
+  mutate(analysis="trial_itt")
+
+all_counts <- all_counts %>% bind_rows(counts)
+
+all_hrs <- all_hrs %>% bind_rows(adjoverlap)
+
+
+## B) PP
+
+f_adjusted_trial_pp <- as.formula(Surv(mace_pp_censtime_yrs, mace_pp_censvar) ~  studydrug  +  malesex + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + ncurrtx_cat + INS + initiation_year + qrisk2_5yr_score)
+
+
+counts <- second_line_cohort %>%
+  group_by(studydrug) %>%
+  summarise(total_count=n(),
+            event_count=sum(mace_pp_censvar),
+            total_time=sum(mace_pp_censtime_yrs),
+            count=paste0(event_count, "/", total_count),
+            ir=round_pad((event_count*1000)/total_time, 2)) %>%
+  select(-c(total_count, event_count, total_time)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_{.value}",
+              values_from=c(count, ir))
+
+adjoverlap <- coxph(f_adjusted_trial_pp, second_line_cohort, weights=overlap_weights) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  select(estimate, conf.low, conf.high) %>%
+  mutate(analysis="trial_pp")
+
+all_counts <- all_counts %>% bind_rows(counts)
+
+all_hrs <- all_hrs %>% bind_rows(adjoverlap)
 ## Death as competing risk
 
 cohort <- cohort %>% 
@@ -374,9 +442,9 @@ cohort %>%
 # Adjusted with overlap weighting
 ## Very slow to run
 
-f_adjusted <- as.formula(paste0("Surv(mace_censtime_yrs, mace_censvar.cr) ~  studydrug  +  ", adjust))
+f_adjusted_crr <- as.formula(paste0("Surv(mace_censtime_yrs, mace_censvar.cr) ~  studydrug  +  ", adjust))
 
-adjoverlap <- crr(f_adjusted, data = cohort, weights=overlap) %>%
+adjoverlap <- crr(f_adjusted_crr, data = cohort, weights=overlap) %>%
   tidy(conf.int=TRUE, exponentiate=TRUE) %>%
   filter(term=="studydrugSGLT2") %>%
   select(estimate, conf.low, conf.high) %>%
@@ -388,63 +456,6 @@ all_counts <- all_counts %>% bind_rows(counts)
 all_hrs <- all_hrs %>% bind_rows(adjoverlap)
 
 
-
-## Different followup
-
-cohort %>% group_by(patid) %>% summarise(count_dpp4=sum(drugclass=="DPP4"), count_su=sum(drugclass=="SU")) %>% filter(count_dpp4==1 & count_su==1) %>% ungroup() %>% count()
-#15626 patids with both DPP4 and SU
-
-cohort %>% filter(studydrug=="DPP4SU") %>% group_by(patid) %>% filter(n()>1 & max(dstartdate)==min(dstartdate)) %>% ungroup() %>% distinct(patid) %>% count()
-#Includes 268 patids which start DPP4 and SU on same day - have checked and follow up time is 0
-
-169041-15626+268 #153683
-
-cohort %>%
-  group_by(patid, studydrug) %>%
-  filter(dstartdate==min(dstartdate)) %>%
-  ungroup() %>%
-  count()
-#153683 (haven't eliminated if start on same day)
-
-
-169041-15626 #153415
-
-sensitivity_cohort <- cohort %>%
-  group_by(patid, studydrug) %>%
-  filter(dstartdate==min(dstartdate) & (n()==1 | dstartdate!=max(dstartdate) | drugclass=="DPP4")) %>%
-  ungroup()
-#153415
-
-overlap <- SumStat(ps.formula=ps.formula, data = as.data.frame(sensitivity_cohort), weight = c("IPW", "overlap"))
-sensitivity_cohort$overlap_weights <- overlap$ps.weights$overlap
-
-f_adjusted <- as.formula(paste0("Surv(mace_can_overlap_censtime_yrs, mace_can_overlap_censvar) ~  studydrug  +  ", adjust))
-
-counts <- sensitivity_cohort %>%
-  group_by(studydrug) %>%
-  summarise(total_count=n(),
-            event_count=sum(mace_can_overlap_censvar),
-            total_time=sum(mace_can_overlap_censtime_yrs),
-            count=paste0(event_count, "/", total_count),
-            ir=round_pad((event_count*1000)/total_time, 2)) %>%
-  select(-c(total_count, event_count, total_time)) %>%
-  pivot_wider(names_from=studydrug,
-              names_glue="{studydrug}_{.value}",
-              values_from=c(count, ir))
-
-adjoverlap <- coxph(f_adjusted, sensitivity_cohort, weights=overlap_weights) %>%
-  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
-  filter(term=="studydrugSGLT2") %>%
-  select(estimate, conf.low, conf.high) %>%
-  mutate(analysis="no control duplicate IDs")
-
-all_counts <- all_counts %>% bind_rows(counts)
-
-all_hrs <- all_hrs %>% bind_rows(adjoverlap)
-
-
-
-
 ## Subset on insulin
 
 on_ins <- cohort %>% filter(INS==1)
@@ -452,15 +463,15 @@ on_ins <- cohort %>% filter(INS==1)
 return_cov_set("weight")
 # remove insulin
 
-ps.formula <- formula(paste("studydrug ~ malesex + dstartdate_age + dstartdate_dm_dur_all + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + prebmi + prehba1c2yrs + presbp + drugline_all + ncurrtx_cat + initiation_year + qrisk2_5yr_score"))
+ps.formula.insulin <- formula(paste("studydrug ~ malesex + dstartdate_age + dstartdate_dm_dur_all + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + prebmi + prehba1c2yrs + presbp + drugline_all + ncurrtx_cat + initiation_year + qrisk2_5yr_score"))
 
 return_cov_set("adjust")
 # remove insulin
 
-f_adjusted <- as.formula(Surv(mace_censtime_yrs, mace_censvar) ~  studydrug  +  malesex + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + drugline_all + ncurrtx_cat + initiation_year + qrisk2_5yr_score)
+f_adjusted_insulin <- as.formula(Surv(mace_censtime_yrs, mace_censvar) ~  studydrug  +  malesex + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + drugline_all + ncurrtx_cat + initiation_year + qrisk2_5yr_score)
 
 
-overlap <- SumStat(ps.formula=ps.formula, data = as.data.frame(on_ins), weight = c("IPW", "overlap"))
+overlap <- SumStat(ps.formula=ps.formula.insulin, data = as.data.frame(on_ins), weight = c("IPW", "overlap"))
 
 on_ins$overlap_weights <- overlap$ps.weights$overlap
 
@@ -476,7 +487,7 @@ counts <- on_ins %>%
               names_glue="{studydrug}_{.value}",
               values_from=c(count, ir))
 
-adjoverlap <- coxph(f_adjusted, on_ins, weights=overlap_weights) %>%
+adjoverlap <- coxph(f_adjusted_insulin, on_ins, weights=overlap_weights) %>%
   tidy(conf.int=TRUE, exponentiate=TRUE) %>%
   filter(term=="studydrugSGLT2") %>%
   select(estimate, conf.low, conf.high) %>%
@@ -488,7 +499,81 @@ all_counts <- all_counts %>% bind_rows(counts)
 
 all_hrs <- all_hrs %>% bind_rows(adjoverlap)
 
+## By sex
 
+### Males only
+
+males <- cohort %>% filter(malesex==1)
+
+return_cov_set("weight")
+# remove sex
+
+ps.formula.sex <- formula(paste("studydrug ~ dstartdate_age + dstartdate_dm_dur_all + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + prebmi + prehba1c2yrs + presbp + drugline_all + ncurrtx_cat + INS + initiation_year + qrisk2_5yr_score"))
+
+return_cov_set("adjust")
+# remove sex
+
+f_adjusted_sex <- as.formula(Surv(mace_censtime_yrs, mace_censvar) ~  studydrug + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + ethnicity_qrisk2_decoded + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + drugline_all + ncurrtx_cat + INS + initiation_year + qrisk2_5yr_score)
+
+
+overlap <- SumStat(ps.formula=ps.formula.sex, data = as.data.frame(males), weight = c("IPW", "overlap"))
+
+males$overlap_weights <- overlap$ps.weights$overlap
+
+counts <- males %>%
+  group_by(studydrug) %>%
+  summarise(total_count=n(),
+            event_count=sum(mace_censvar),
+            total_time=sum(mace_censtime_yrs),
+            count=paste0(event_count, "/", total_count),
+            ir=round_pad((event_count*1000)/total_time, 2)) %>%
+  select(-c(total_count, event_count, total_time)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_{.value}",
+              values_from=c(count, ir))
+
+adjoverlap <- coxph(f_adjusted_sex, males, weights=overlap_weights) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  select(estimate, conf.low, conf.high) %>%
+  mutate(analysis="males")
+									  
+
+
+all_counts <- all_counts %>% bind_rows(counts)
+
+all_hrs <- all_hrs %>% bind_rows(adjoverlap)
+
+
+### Females only
+
+females <- cohort %>% filter(malesex==0)
+
+overlap <- SumStat(ps.formula=ps.formula.sex, data = as.data.frame(females), weight = c("IPW", "overlap"))
+
+females$overlap_weights <- overlap$ps.weights$overlap
+
+counts <- females %>%
+  group_by(studydrug) %>%
+  summarise(total_count=n(),
+            event_count=sum(mace_censvar),
+            total_time=sum(mace_censtime_yrs),
+            count=paste0(event_count, "/", total_count),
+            ir=round_pad((event_count*1000)/total_time, 2)) %>%
+  select(-c(total_count, event_count, total_time)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_{.value}",
+              values_from=c(count, ir))
+
+adjoverlap <- coxph(f_adjusted_sex, females, weights=overlap_weights) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  select(estimate, conf.low, conf.high) %>%
+  mutate(analysis="females")
+
+all_counts <- all_counts %>% bind_rows(counts)
+
+all_hrs <- all_hrs %>% bind_rows(adjoverlap)
 
 
 # All methods
@@ -528,9 +613,15 @@ styles <- fpShapesGp(
     gpar(col = "black"),
     gpar(col = "black"),
     gpar(col = "black"),
+    gpar(col = "black"),
+    gpar(col = "black"),
+    gpar(col = "black"),
     gpar(col = "red")
   ),
   box = list(
+    gpar(fill = "black"),
+    gpar(fill = "black"),
+    gpar(fill = "black"),
     gpar(fill = "black"),
     gpar(fill = "black"),
     gpar(fill = "black"),
@@ -547,18 +638,18 @@ styles <- fpShapesGp(
 )
 
 
-text %>% forestplot(labeltext = list(analysis_text=list("Primary analysis: adjusted\nwith overlap weighting", "SU-only comparator group", "DPP4i-only comparator group", "Unadjusted with overlap weighting", "Adjusted with no weighting", "Adjusted with IPTW", expression("More specific MACE definition"^1), expression("Patients on either DPP4i or SU"^2), expression("Death as a competing risk"^3), "Insulin-treated subgroup only", "Trial meta-analysis"), SGLT2_count=text$SGLT2_count, SGLT2_ir=text$SGLT2_ir, DPP4SU_count=text$DPP4SU_count, DPP4SU_ir=text$DPP4SU_ir, hr_text=text$hr_text),
+text %>% forestplot(labeltext = list(analysis_text=list("Primary analysis: adjusted\nwith overlap weighting", "SU-only comparator group", "DPP4i-only comparator group", "Unadjusted with overlap weighting", "Adjusted with no weighting", "Adjusted with IPTW", expression("More specific MACE definition"^1), expression("Second-line intention-to-treat"^2), expression("Second-line per-protocol"^2), expression("Death as a competing risk"^3), "Insulin-treated subgroup only", "Males only", "Females only", "Trial meta-analysis"), SGLT2_count=text$SGLT2_count, SGLT2_ir=text$SGLT2_ir, DPP4SU_count=text$DPP4SU_count, DPP4SU_ir=text$DPP4SU_ir, hr_text=text$hr_text),
                     xlog = T,
                     ci.vertices = TRUE,
                     xlab = "Hazard ratio ",
                     fn.ci_norm = fpDrawCircleCI,
-                    xticks = c(log(0.6), log(0.7), log(0.8), log(0.9), log(1.0), log(1.1), log(1.2)),
+                    xticks = c(log(0.5), log(0.6), log(0.7), log(0.8), log(0.9), log(1.0), log(1.1), log(1.2)),
                     boxsize = 0.25,
                     align = c("l", "l", "l", "l", "l"),
                     graph.pos=6,
                     lwd.zero = 1.2,
                     shapes_gp = styles,
-                    col = fpColors(zero = c("grey50"), text=c('black','black','black','black','black','black','black','black','black','black', 'black', 'red')),
+                    col = fpColors(zero = c("grey50"), text=c('black','black','black','black','black','black','black','black','black','black','black','black','black', 'black', 'red')),
                     lwd.ci=1,
                     ci.vertices.height = 0.2,
                     colgap = unit(6, "mm"),
@@ -692,9 +783,9 @@ spline_plot <- ggplot(data=contrast_spline_df, aes(x=qrisk2_5yr_score, y=exp(Con
 
 
 spline_plot <- spline_plot +
-  annotate(geom="text", x=5, y=2, label="Overall HR in study cohort (95% CI): 0.84 (0.77-0.91)", color="black", hjust=0, size = 6) +
+  annotate(geom="text", x=5, y=2, label="Overall HR in study cohort (95% CI): 0.84 (0.77 to 0.91)", color="black", hjust=0, size = 6) +
   annotate(geom="text", x=5, y=1.8, label="p-value for CVD risk * drug arm interaction on CVD outcome: 0.12", color="black", hjust=0, size = 6) +
-  annotate(geom="text", x=5, y=1.6, label="Trial meta-analysis HR (95% CI): 0.94 (0.83-1.07)", color="red", hjust=0, size = 6) 
+  annotate(geom="text", x=5, y=1.6, label="Trial meta-analysis HR (95% CI): 0.94 (0.83 to 1.07)", color="red", hjust=0, size = 6) 
 
 
 

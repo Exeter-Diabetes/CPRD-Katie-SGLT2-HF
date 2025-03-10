@@ -80,7 +80,7 @@ obs_v_pred <- cbind(predicted, observed) %>%
 
 dodge <- position_dodge(width=0.3)
 
-tiff("../../Plots/QDHF_median.tiff", width=9, height=7, units = "in", res=800) 
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/QDHF_median.tiff", width=9, height=7, units = "in", res=800) 
 
 ggplot(data=obs_v_pred, aes(x=qdhf_decile)) +
   geom_point(aes(y = observed*100, color="observed", shape="observed"), size=3, position=dodge) +

@@ -1,6 +1,7 @@
 
 # Produce survival variables for all endpoints (including for sensitivity analysis)
-## All censored at 5 years post drug start (3 years for 'ckd_egfr40') / end of GP records / death / starting a different diabetes med which affects CV risk (TZD/GLP1/SGLT2), and also drug stop date + 6 months for per-protocol analysis
+## All censored at 5 years post drug start / end of GP records / death
+## Additional censoring for sensitivity analyses
 
 # Main analysis:
 ## 'mace': stroke, MI, CV death
@@ -12,6 +13,7 @@
 # Sensitivity analysis:
 ## 'narrow_mace': hospitalisation for incident MI (subset of HES codes), incident stroke (subset of HES codes, includes ischaemic only), CV death - all as primary cause for hospitalisation/death only
 ## 'narrow_hf': hospitalisation or death with HF as primary cause
+## Also includes code for alternative censoring strategies
 
 
 add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
@@ -21,7 +23,7 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
   
   cohort <- cohort_dataset %>%
     
-    mutate(cens_itt=pmin(dstartdate+(365.25*5),
+    mutate(cens_main=pmin(dstartdate+(365.25*5),
                          gp_record_end,
                          death_date,
                          next_tzd_start,
@@ -60,7 +62,7 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
     censtime_var=paste0(i, "_censtime_yrs")
 
     cohort <- cohort %>%
-      mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_itt, na.rm=TRUE),
+      mutate({{censdate_var}}:=pmin(!!sym(outcome_var), cens_main, na.rm=TRUE),
              {{censvar_var}}:=ifelse(!is.na(!!sym(outcome_var)) & !!sym(censdate_var)==!!sym(outcome_var), 1, 0),
              {{censtime_var}}:=as.numeric(difftime(!!sym(censdate_var), dstartdate, unit="days"))/365.25)
     
@@ -80,15 +82,16 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
     
     cohort <- cohort %>%
       
-      mutate(cens_itt_can_overlap=pmin(dstartdate+(365.25*5),
-                                       gp_record_end,
-                                       death_date,
-                                       next_tzd_start,
-                                       next_glp1_start,
-                                       if_else(drugclass!="SGLT2", next_sglt2_start, as.Date("2050-01-01")),
-                                       if_else(drugclass=="SGLT2", dpp4_start_later, as.Date("2050-01-01")),
-                                       if_else(drugclass=="SGLT2", su_start_later, as.Date("2050-01-01")),
-                                       na.rm=TRUE),
+      mutate(cens_itt=pmin(dstartdate+(365.25*5),
+                           gp_record_end,
+                           death_date,
+                           na.rm=TRUE),
+             
+             cens_pp=pmin(dstartdate+(365.25*5),
+                          gp_record_end,
+                          death_date,
+                          dstartdate+timetochange, #dstopdate can be before dstartdate+timetochange as timetochange is time to new drug combo, where dstopdate is last prescription - have used timetochange instead - max 6 months
+                          na.rm=TRUE),
              
              narrow_mace_outcome=pmin(postdrug_first_incident_mi,
                                       postdrug_first_incident_stroke,
@@ -99,14 +102,21 @@ add_surv_vars <- function(cohort_dataset, main_only=FALSE) {
                                     hf_death_date_primary_cause,
                                     na.rm=TRUE),
              
-             hf_can_overlap_censdate=pmin(hf_outcome, cens_itt_can_overlap, na.rm=TRUE),
-             hf_can_overlap_censvar=ifelse(!is.na(hf_outcome) & hf_can_overlap_censdate==hf_outcome, 1, 0),
-             hf_can_overlap_censtime_yrs=as.numeric(difftime(hf_can_overlap_censdate, dstartdate, unit="days"))/365.25,
+             hf_itt_censdate=pmin(hf_outcome, cens_itt, na.rm=TRUE),
+             hf_itt_censvar=ifelse(!is.na(hf_outcome) & hf_itt_censdate==hf_outcome, 1, 0),
+             hf_itt_censtime_yrs=as.numeric(difftime(hf_itt_censdate, dstartdate, unit="days"))/365.25,
              
-             mace_can_overlap_censdate=pmin(mace_outcome, cens_itt_can_overlap, na.rm=TRUE),
-             mace_can_overlap_censvar=ifelse(!is.na(mace_outcome) & mace_can_overlap_censdate==mace_outcome, 1, 0),
-             mace_can_overlap_censtime_yrs=as.numeric(difftime(mace_can_overlap_censdate, dstartdate, unit="days"))/365.25)
-    
+             hf_pp_censdate=pmin(hf_outcome, cens_pp, na.rm=TRUE),
+             hf_pp_censvar=ifelse(!is.na(hf_outcome) & hf_pp_censdate==hf_outcome, 1, 0),
+             hf_pp_censtime_yrs=as.numeric(difftime(hf_pp_censdate, dstartdate, unit="days"))/365.25,
+             
+             mace_itt_censdate=pmin(mace_outcome, cens_itt, na.rm=TRUE),
+             mace_itt_censvar=ifelse(!is.na(mace_outcome) & mace_itt_censdate==mace_outcome, 1, 0),
+             mace_itt_censtime_yrs=as.numeric(difftime(mace_itt_censdate, dstartdate, unit="days"))/365.25,
+             
+             mace_pp_censdate=pmin(mace_outcome, cens_pp, na.rm=TRUE),
+             mace_pp_censvar=ifelse(!is.na(mace_outcome) & mace_pp_censdate==mace_outcome, 1, 0),
+             mace_pp_censtime_yrs=as.numeric(difftime(mace_pp_censdate, dstartdate, unit="days"))/365.25)
     
     for (i in sensitivity_outcomes) {
       
