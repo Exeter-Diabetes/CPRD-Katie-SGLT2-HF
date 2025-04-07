@@ -22,8 +22,7 @@ rm(list=ls())
 
 # 1 Cohort selection and variable setup
 
-setwd("/slade/CPRD_data/Katie SGLT2/Processed data")
-load("treatment_outcome_cohort_jun24.rda")
+setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
 #169,041
 
 table(cohort$studydrug)
@@ -33,7 +32,7 @@ table(cohort$studydrug)
 
 ## B Make variables for survival analysis of all endpoints (see survival_variables function for details)
 
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
 source("survival_variables.R")
 
 cohort <- add_surv_vars(cohort, main_only=TRUE)
@@ -69,6 +68,8 @@ observed <- survfit(Surv(hf_censtime_yrs, hf_censvar) ~ qdhf_decile, data=dpp4su
          lower_ci=1-conf.low,
          upper_ci=1-conf.high)
 
+
+
 events_table <- t(dpp4su %>%
   filter(hf_censvar==1) %>%
   group_by(qdhf_decile) %>%
@@ -80,7 +81,7 @@ obs_v_pred <- cbind(predicted, observed) %>%
 
 dodge <- position_dodge(width=0.3)
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/QDHF_median.tiff", width=9, height=7, units = "in", res=800) 
+tiff("../../Plots/QDHF_median.tiff", width=9, height=7, units = "in", res=800) 
 
 ggplot(data=obs_v_pred, aes(x=qdhf_decile)) +
   geom_point(aes(y = observed*100, color="observed", shape="observed"), size=3, position=dodge) +

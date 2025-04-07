@@ -130,7 +130,7 @@ cohort %>% distinct(patid) %>% count()
 
 
 ## Use R data from here
-setwd("/slade/CPRD_data/mastermind_2022/")
+setwd("/slade/CPRD_data/2020_dataset/Mastermind/")
 load("20240219_t2d_1stinstance.Rda")
 
 
@@ -219,10 +219,10 @@ table(cohort$studydrug)
 
 # Check matches cohort definition function
 # Also formats variables correctly
-setwd("/slade/CPRD_data/mastermind_2022/")
+setwd("/slade/CPRD_data/2020_dataset/Mastermind/")
 load("20240219_t2d_all_drug_periods.Rda")
 
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
 source("cohort_definition.R")
 
 cohort <- define_cohort(t2d_1stinstance, t2d_all_drug_periods)
@@ -250,7 +250,7 @@ cohort <- cohort %>%
          hypertension=ifelse(predrug_hypertension==1 | presbp>190 | (!is.na(predbp) & predbp>90), TRUE, FALSE))
 
 
-setwd("/slade/CPRD_data/Katie SGLT2/Processed data")
+setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
 save(cohort, file="treatment_outcome_cohort_jun24.rda")
 
 

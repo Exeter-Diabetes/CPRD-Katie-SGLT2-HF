@@ -1,5 +1,5 @@
 
-# Baseline characteristics: unweighted and weighted for treatment outcome, unweighted for contemporary
+# Baseline characteristics: unweighted and weighted
 
 
 ############################################################################################
@@ -19,7 +19,7 @@ rm(list=ls())
 
 # 1 Treatment outcome cohort
 
-setwd("/slade/CPRD_data/Katie SGLT2/Processed data")
+setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
 load("treatment_outcome_cohort_jun24.rda")
 #169,041
 
@@ -112,7 +112,7 @@ label(cohort$initiation_year)       <- "Year of drug initiation"
 label(cohort$qdiabeteshf_5yr_score) <- "QDiabetes-Heart Failure 5-year score (%)"
 
 
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
 source("full_covariate_set.R")
 
 return_cov_set("weight")
@@ -181,3 +181,51 @@ love.plot(studydrug ~ malesex + dstartdate_age + dstartdate_dm_dur_all + ethnici
         plot.title=element_text(size=16))
 
 dev.off()
+
+
+############################################################################################
+
+# Look at how close biomarkers are to drug start date on average
+
+data <- cohort %>% 
+  mutate(preacrdrugdiff_new=ifelse(!is.na(preacr), preacrdrugdiff, preacr_from_separatedrugdiff)) %>%
+  select(patid, dstartdate, studydrug, prehba1cdrugdiff, prebmidrugdiff, pretotalcholesteroldrugdiff, prehdldrugdiff, presbpdrugdiff, predbpdrugdiff, preacrdrugdiff_new)
+  
+summary(data$prehba1cdrugdiff)
+#median=15 days
+
+summary(data$prebmidrugdiff)
+#median=27 days
+
+summary(data$pretotalcholesteroldrugdiff)
+#median=32 days
+
+summary(data$prehdldrugdiff)
+#median=35 days
+
+summary(data$presbpdrugdiff)
+#median=13 days
+
+summary(data$predbpdrugdiff)
+#median=13 days
+
+summary(data$preacrdrugdiff_new)
+#median=123 days
+
+data <- data %>%
+  pivot_longer(cols=c(prehba1cdrugdiff, prebmidrugdiff, pretotalcholesteroldrugdiff, prehdldrugdiff, presbpdrugdiff, predbpdrugdiff, preacrdrugdiff_new))
+
+summary(data$value)
+#median=24 days
+
+data %>% filter(!is.na(value)) %>% count()
+#1129305
+
+data %>% filter(!is.na(value) & value>=-183) %>% count()
+#944122
+
+944122/1129305
+#83.6%
+
+
+

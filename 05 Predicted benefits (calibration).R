@@ -24,17 +24,17 @@ rm(list=ls())
 
 # 1 Cohort selection (see script 00)
 
-setwd("/slade/CPRD_data/Katie SGLT2/Processed data")
+setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
 load("treatment_outcome_cohort_jun24.rda")
 
 # Add survival variables
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
 source("survival_variables.R")
 
 cohort <- add_surv_vars(cohort, main_only=T)
 
 # now using functions to define covariates adjusted and weighted for
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
 source("full_covariate_set.R")
 
 
@@ -111,6 +111,8 @@ f_adjusted <- as.formula(paste0("Surv(hf_censtime_yrs, hf_censvar) ~ studydrug  
 
 # This is without studydrug * risk interaction term - which would allow HR to vary with risk
 model <- cph(f_adjusted, data=cohort, weights=overlap_weights, x=T, y=T, surv=TRUE)
+
+
 
 cohort.t <- data.frame(cohort) %>% mutate(studydrug="DPP4SU")
 DPP4SU.pred = survest(model,newdata=cohort.t,times=5,se.fit=F)

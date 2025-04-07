@@ -23,17 +23,17 @@ rm(list=ls())
 
 # 1 Cohort selection (see script 00)
 
-setwd("/slade/CPRD_data/Katie SGLT2/Processed data")
+setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
 load("treatment_outcome_cohort_jun24.rda")
 
 # Add survival variables
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
 source("survival_variables.R")
 
 cohort <- add_surv_vars(cohort, main_only=T)
 
 # now using functions to define covariates adjusted and weighted for
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
 source("full_covariate_set.R")
 
 
@@ -63,6 +63,7 @@ model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~  studydrug*rcs(qdiabeteshf_5yr_
 
 anova(model)
 # no interaction - good (p=0.82)
+
 
 c1 <- quantile(cohort$qdiabeteshf_5yr_score, .01, na.rm=TRUE)
 c99 <- quantile(cohort$qdiabeteshf_5yr_score, .99, na.rm=TRUE)
@@ -201,8 +202,6 @@ stats::anova(model_4, model_5)
 #same as above
 
 
-
-
 ############################################################################################
 
 # Stratified by sex
@@ -230,3 +229,4 @@ model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~  studydrug*rcs(qdiabeteshf_5yr_
 
 anova(model)
 # no interaction - good (p=0.17)
+
