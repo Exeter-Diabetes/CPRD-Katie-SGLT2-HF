@@ -23,7 +23,7 @@ rm(list=ls())
 
 # 1 Cohort selection and variable setup
 
-setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Processed data/")
+setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
 load("treatment_outcome_cohort_jun24.rda")
 #169,041
 
@@ -34,7 +34,7 @@ table(cohort$studydrug)
 
 ## B Make variables for survival analysis of all endpoints (see survival_variables function for details)
 
-setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Scripts_localdata/Functions/")
+setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
 source("survival_variables.R")
 
 cohort <- add_surv_vars(cohort, main_only=TRUE)
@@ -213,7 +213,7 @@ for (i in strategies) {
 
 table <- table %>% mutate(arr_text=paste0(round_pad(arr, 2), " (", round_pad(arr_lower_ci, 2), "-", round_pad(arr_upper_ci, 2), ")")) %>% rename(mean=arr, lower=arr_lower_ci, upper=arr_upper_ci)
 
-tiff("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Plots/strategy_benefit.tiff", width=16, height=6, units = "in", res=400) 
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/strategy_benefit.tiff", width=16, height=6, units = "in", res=400) 
 
 table %>% forestplot(labeltext = list(analysis_text=list("Treat all", expression("UK NICE guidance "^1), expression("ADA/EASD guidance "^2), expression("SABRE model matched to NICE "^3), expression("SABRE model matched to ADA/EASD "^4), expression("SABRE model restricted strategy "^5), expression("QRISK2 matched to ADA/EASD "^6), expression("QRISK2 restricted strategy "^7)), treat_text=table$treat, arr_text=table$arr_text, nnt=table$nnt),
                      ci.vertices = TRUE,
@@ -345,7 +345,7 @@ plot <- grid.arrange(arrangeGrob(
   p1[[4]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)), ncol=2, nrow=2, widths=c(1,1)))
 
 
-tiff("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Plots/main_strategies.tiff", width=10, height=12, units = "in", res=800)
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/main_strategies.tiff", width=10, height=12, units = "in", res=800)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("a) ADA/EASD guidance strategy", "b) SABRE model restricted strategy"), size = 20,  hjust=0, x = c(0, 0), y = c(1, 0.475))
@@ -453,7 +453,7 @@ plot <- grid.arrange(arrangeGrob(
   ncol=2, nrow=2, widths=c(1,1)))
  
 
-tiff("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Plots/other_strategies_A.tiff", width=10, height=10, units = "in", res=800)
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_A.tiff", width=10, height=10, units = "in", res=800)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("a) UK NICE guidance strategy", "b) SABRE model matched to NICE"), size = 20,  hjust=0, x = c(0, 0), y = c(1, 0.47))
@@ -473,7 +473,7 @@ plot <- grid.arrange(arrangeGrob(
 
 
 
-tiff("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Plots/other_strategies_B.tiff", width=10, height=15, units = "in", res=800)
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_B.tiff", width=10, height=15, units = "in", res=800)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("c) SABRE model matched to ADA/EASD", "d) QRISK2 model matched to ADA/EASD", "e) QRISK2 restricted strategy"), size = 20,  hjust=0, x = c(0, 0, 0), y = c(1, 0.647, 0.315))
