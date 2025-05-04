@@ -11,6 +11,8 @@ library(grid)
 library(PSweight)
 library(rms)
 library(table1)
+library(forestplot)
+library(boot)
 
 options(dplyr.summarise.inform = FALSE)
 
@@ -21,7 +23,7 @@ rm(list=ls())
 
 # 1 Cohort selection and variable setup
 
-setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
+setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Processed data/")
 load("treatment_outcome_cohort_jun24.rda")
 #169,041
 
@@ -32,7 +34,7 @@ table(cohort$studydrug)
 
 ## B Make variables for survival analysis of all endpoints (see survival_variables function for details)
 
-setwd("/slade/CPRD_data/Katie SGLT2/Scripts/Functions/")
+setwd("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Scripts_localdata/Functions/")
 source("survival_variables.R")
 
 cohort <- add_surv_vars(cohort, main_only=TRUE)
@@ -58,7 +60,6 @@ cohort <- cohort %>%
          qdhf_survival_sglt2=qdhf_survival^0.63,
          qdiabeteshf_5yr_score_sglt2=100-(qdhf_survival_sglt2*100),
          qdhf_sglt2_benefit=qdhf_survival_sglt2-qdhf_survival)
-
 
 
 ############################################################################################
@@ -147,49 +148,90 @@ cohort <- cohort %>% mutate(sabre_matched_nice=ifelse((qdhf_sglt2_benefit*100)>0
 
 ############################################################################################
 
-# 5 Figures for table
+# 5 Figures for plot
 
-## Total number of HF cases in whole study population over 5 years based on mean HF risk
-describe(cohort$qdiabeteshf_5yr_score) #Mean HR risk 3.78%
-hf.notx <- round(nrow(cohort)*mean(cohort$qdiabeteshf_5yr_score/100))
-hf.notx
-#6382
+## Absolute risk reduction (benefit) per 100 patient-years and NNT as per: https://dom-pubs.pericles-prod.literatumonline.com/doi/full/10.1111/dom.14893)
 
-6382/169041
+## Bootstrap for 95% CIs
 
 cohort <- cohort %>% mutate(treat_all=1)
 
 strategies <- c("treat_all", "nice_qrisk2_10", "ada_easd", "sabre_matched_nice", "sabre_matched_adaeasd", "sabre_restricted", "qrisk2_matched_adaeasd", "qrisk2_restricted")
 
-table <- data.frame(strategy=character(), treat=character(), hf_cases=character(), hf_prevented=character(), nnt=numeric())
+table <- data.frame(strategy=character(), treat=character(), arr=numeric(), arr_lower_ci=numeric(), arr_upper_ci=numeric(), nnt=character())
+
+boot_fn <- function(data, indices) {
+
+  d <- data[indices, ]
+  
+  n <- nrow(d)
+  
+  # Compute events under untreated and treated scenarios
+  events_if_untreated <- round(n * mean(d$qdiabeteshf_5yr_score / 100))
+  events_if_treated <- round(n * mean(d$qdiabeteshf_5yr_score_sglt2 / 100))
+  
+  # Absolute risk reduction (ARR) per 100 person-years
+  arr <- ((events_if_untreated - events_if_treated) / (5 * n)) * 100
+  
+  # NNT per year to prevent 1 event
+  nnt <- (1/(arr))*100
+  
+  return(c(arr = arr, nnt = nnt))
+}
 
 
 for (i in strategies) {
-
-  treat_n <- unlist(cohort %>% filter(!!(as.symbol(i))==1) %>% count())
-  treat_perc <- round_pad((treat_n/169041)*100,1)
-  treat <- paste0(treat_n, " (", treat_perc, "%)")
-
-  cohort <- cohort %>% mutate(qdiabeteshf_5yr_score.applied=ifelse(!!(as.symbol(i))==0, qdiabeteshf_5yr_score, qdiabeteshf_5yr_score_sglt2))
-  hf_cases_n <- round(169041*mean(cohort$qdiabeteshf_5yr_score.applied/100))
-  hf_cases_perc <- round_pad((hf_cases_n/169041)*100,1)
-  hf_cases <- paste0(hf_cases_n, " (", hf_cases_perc, "%)")
-
-  hf_prevented_n <- 6382-hf_cases_n
-  hf_prevented_perc <- round_pad((hf_prevented_n/6382)*100,1)
-  hf_prevented <- paste0(hf_prevented_n, " (", hf_prevented_perc, "%)")
-
-  nnt <- round(treat_n/hf_prevented_n, 0)
   
-  se_nnt=sqrt((sd(cohort$qdiabeteshf_5yr_score)/sqrt(length(cohort$qdiabeteshf_5yr_score)))^2 + (sd(cohort$qdiabeteshf_5yr_score.applied)/sqrt(length(cohort$qdiabeteshf_5yr_score.applied)))^2)
-  nnt_lower <- round((as.numeric(treat_perc)) / (mean(cohort$qdiabeteshf_5yr_score) - mean(cohort$qdiabeteshf_5yr_score.applied) + 1.96*se_nnt), 2)
-  nnt_upper <- round((as.numeric(treat_perc)) / (mean(cohort$qdiabeteshf_5yr_score) - mean(cohort$qdiabeteshf_5yr_score.applied) - 1.96*se_nnt), 2)
-
-  data <- cbind(strategy=i, treat, hf_cases, hf_prevented, nnt, nnt_lower, nnt_upper)
-
+  cohort_to_treat <- cohort %>% filter(!!(as.symbol(i))==1)
+  
+  # % treated
+  treat_n <- unlist(cohort_to_treat %>% count())
+  treat <- paste0(round_pad((treat_n/169041)*100,1), "%")
+  
+  # Bootstrap for CIs
+  set.seed(123)  # For reproducibility
+  boot_results <- boot(data = cohort_to_treat, statistic = boot_fn, R = 1000)
+  
+  arr <- boot.ci(boot_results, type = "perc", index = 1)$t0
+  arr_lower_ci <-  boot.ci(boot_results, type = "perc", index = 1)$percent[4]
+  arr_upper_ci <-  boot.ci(boot_results, type = "perc", index = 1)$percent[5]
+  
+  nnt <- boot.ci(boot_results, type = "perc", index = 2)$t0
+  nnt_lower_ci <-  boot.ci(boot_results, type = "perc", index = 2)$percent[4]
+  nnt_upper_ci <-  boot.ci(boot_results, type = "perc", index = 2)$percent[5]
+  
+  nnt <- paste0(round_pad(nnt, 0)," (", round_pad(nnt_lower_ci, 0), "-", round_pad(nnt_upper_ci, 0), ")")
+  
+  data <- data.frame(strategy=i, treat, arr, arr_lower_ci, arr_upper_ci, nnt)
+  
   table <- table %>% rbind(data)
-
+  
 }
+
+
+# Plot
+
+table <- table %>% mutate(arr_text=paste0(round_pad(arr, 2), " (", round_pad(arr_lower_ci, 2), "-", round_pad(arr_upper_ci, 2), ")")) %>% rename(mean=arr, lower=arr_lower_ci, upper=arr_upper_ci)
+
+tiff("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Plots/strategy_benefit.tiff", width=16, height=6, units = "in", res=400) 
+
+table %>% forestplot(labeltext = list(analysis_text=list("Treat all", expression("UK NICE guidance "^1), expression("ADA/EASD guidance "^2), expression("SABRE model matched to NICE "^3), expression("SABRE model matched to ADA/EASD "^4), expression("SABRE model restricted strategy "^5), expression("QRISK2 matched to ADA/EASD "^6), expression("QRISK2 restricted strategy "^7)), treat_text=table$treat, arr_text=table$arr_text, nnt=table$nnt),
+                     ci.vertices = TRUE,
+                     xlab = "Absolute benefit for HF in SGLT2i treated group (events prevented per 100 patient-years)",
+                     fn.ci_norm = fpDrawCircleCI,
+                     xticks = c(0, 0.2, 0.4, 0.6, 0.8, 1.0),
+                     boxsize = 0.25,
+                     graph.pos=3,
+                     lwd.zero = 1.2,
+                     lwd.ci=4,
+                     ci.vertices.height = 0.2,
+                     colgap = unit(5, "mm"),
+                     txt_gp = fpTxtGp(xlab=gpar(cex=1.5, fontface="bold", lineheight=10), ticks=gpar(cex=1.4), label=gpar(cex=1.4))) %>%
+  fp_add_header(analysis_text = "Strategy", treat_text = "Proportion of\npopulation treated", arr_text = "", nnt = "NNT (95% CI)")
+
+dev.off()
+
+
 
 
 ############################################################################################
@@ -303,7 +345,7 @@ plot <- grid.arrange(arrangeGrob(
   p1[[4]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)), ncol=2, nrow=2, widths=c(1,1)))
 
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/main_strategies.tiff", width=10, height=12, units = "in", res=800)
+tiff("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Plots/main_strategies.tiff", width=10, height=12, units = "in", res=800)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("a) ADA/EASD guidance strategy", "b) SABRE model restricted strategy"), size = 20,  hjust=0, x = c(0, 0), y = c(1, 0.475))
@@ -411,7 +453,7 @@ plot <- grid.arrange(arrangeGrob(
   ncol=2, nrow=2, widths=c(1,1)))
  
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_A.tiff", width=10, height=10, units = "in", res=800)
+tiff("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Plots/other_strategies_A.tiff", width=10, height=10, units = "in", res=800)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("a) UK NICE guidance strategy", "b) SABRE model matched to NICE"), size = 20,  hjust=0, x = c(0, 0), y = c(1, 0.47))
@@ -431,7 +473,7 @@ plot <- grid.arrange(arrangeGrob(
 
 
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_B.tiff", width=10, height=15, units = "in", res=800)
+tiff("C:/Users/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Plots/other_strategies_B.tiff", width=10, height=15, units = "in", res=800)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("c) SABRE model matched to ADA/EASD", "d) QRISK2 model matched to ADA/EASD", "e) QRISK2 restricted strategy"), size = 20,  hjust=0, x = c(0, 0, 0), y = c(1, 0.647, 0.315))
