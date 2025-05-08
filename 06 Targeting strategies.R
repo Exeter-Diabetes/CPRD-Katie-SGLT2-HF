@@ -197,10 +197,10 @@ for (i in strategies) {
   arr_upper_ci <-  boot.ci(boot_results, type = "perc", index = 1)$percent[5]
   
   nnt <- boot.ci(boot_results, type = "perc", index = 2)$t0
-  nnt_lower_ci <-  boot.ci(boot_results, type = "perc", index = 2)$percent[4]
-  nnt_upper_ci <-  boot.ci(boot_results, type = "perc", index = 2)$percent[5]
+  #nnt_lower_ci <-  boot.ci(boot_results, type = "perc", index = 2)$percent[4]
+  #nnt_upper_ci <-  boot.ci(boot_results, type = "perc", index = 2)$percent[5]
   
-  nnt <- paste0(round_pad(nnt, 0)," (", round_pad(nnt_lower_ci, 0), "-", round_pad(nnt_upper_ci, 0), ")")
+  nnt <- round_pad(nnt, 0) #paste0(round_pad(nnt, 0)," (", round_pad(nnt_lower_ci, 0), "-", round_pad(nnt_upper_ci, 0), ")")
   
   data <- data.frame(strategy=i, treat, arr, arr_lower_ci, arr_upper_ci, nnt)
   
@@ -217,7 +217,7 @@ tiff("/slade/CPRD_data/Katie SGLT2/Plots/strategy_benefit.tiff", width=16, heigh
 
 table %>% forestplot(labeltext = list(analysis_text=list("Treat all", expression("UK NICE guidance "^1), expression("ADA/EASD guidance "^2), expression("SABRE model matched to NICE "^3), expression("SABRE model matched to ADA/EASD "^4), expression("SABRE model restricted strategy "^5), expression("QRISK2 matched to ADA/EASD "^6), expression("QRISK2 restricted strategy "^7)), treat_text=table$treat, arr_text=table$arr_text, nnt=table$nnt),
                      ci.vertices = TRUE,
-                     xlab = "Absolute benefit for HF in SGLT2i treated group (events prevented per 100 patient-years)",
+                     #xlab = "Events prevented per 100 patient-years",
                      fn.ci_norm = fpDrawCircleCI,
                      xticks = c(0, 0.2, 0.4, 0.6, 0.8, 1.0),
                      boxsize = 0.25,
@@ -226,8 +226,20 @@ table %>% forestplot(labeltext = list(analysis_text=list("Treat all", expression
                      lwd.ci=4,
                      ci.vertices.height = 0.2,
                      colgap = unit(5, "mm"),
+                     mar = unit(c(15,2,2,2), "mm"),
                      txt_gp = fpTxtGp(xlab=gpar(cex=1.5, fontface="bold", lineheight=10), ticks=gpar(cex=1.4), label=gpar(cex=1.4))) %>%
-  fp_add_header(analysis_text = "Strategy", treat_text = "Proportion of\npopulation treated", arr_text = "", nnt = "NNT (95% CI)")
+  fp_add_header(analysis_text = "Strategy", treat_text = "Proportion of\npopulation treated", arr_text = "", nnt = "NNT")
+
+
+grid.text("Absolute risk for HF in SGLT2i treated group", 
+          x = 0.7, 
+          y = unit(1, "npc") - unit(1.1, "lines"), 
+          gp = gpar(fontsize = 19, fontface = "bold"))
+
+grid.text("Events prevented per 100 patient-year (95% CI)", 
+          x = 0.7, 
+          y = 0.05, 
+          gp = gpar(fontsize = 19, fontface = "bold"))
 
 dev.off()
 
