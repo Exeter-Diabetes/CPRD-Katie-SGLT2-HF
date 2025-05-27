@@ -141,7 +141,7 @@ x_hist <- marginal_distribution(hist.dta, "qdiabeteshf_5yr_score")
 
 
 setwd("/slade/CPRD_data/Katie SGLT2/Plots/")
-tiff("HR_by_HF_risk.tiff", width=9, height=7, units = "in", res=800) 
+tiff("Figure_1.tiff", width=9, height=7, units = "in", res=600) 
 
 plot_grid(spline_plot, x_hist, ncol = 1,align = 'v',
           rel_heights = c(1,0.5), rel_widths = c(1,1))

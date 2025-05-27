@@ -234,7 +234,7 @@ hist_plot <- ggplot(cohort, aes(x=qdhf_sglt2_benefit*100)) +
 
 
 setwd("/slade/CPRD_data/Katie SGLT2/Plots/")
-tiff("calibration_benefits_no_interaction.tiff", width=8, height=8, units = "in", res=800) 
+tiff("Figure_2.tiff", width=8, height=8, units = "in", res=600) 
 
 plot_grid(cal_plot, hist_plot, ncol = 1,align = 'v',
           rel_heights = c(1,0.5), rel_widths = c(1,1))

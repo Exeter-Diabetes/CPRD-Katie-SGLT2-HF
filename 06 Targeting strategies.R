@@ -213,7 +213,7 @@ for (i in strategies) {
 
 table <- table %>% mutate(arr_text=paste0(round_pad(arr, 2), " (", round_pad(arr_lower_ci, 2), "-", round_pad(arr_upper_ci, 2), ")")) %>% rename(mean=arr, lower=arr_lower_ci, upper=arr_upper_ci)
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/strategy_benefit.tiff", width=16, height=6, units = "in", res=400) 
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/Figure_3.tiff", width=16, height=6, units = "in", res=600) 
 
 table %>% forestplot(labeltext = list(analysis_text=list("Treat all", expression("UK NICE guidance "^1), expression("ADA/EASD guidance "^2), expression("SABRE model matched to NICE "^3), expression("SABRE model matched to ADA/EASD "^4), expression("SABRE model restricted strategy "^5), expression("QRISK2 matched to ADA/EASD "^6), expression("QRISK2 restricted strategy "^7)), treat_text=table$treat, arr_text=table$arr_text, nnt=table$nnt),
                      ci.vertices = TRUE,
@@ -231,7 +231,7 @@ table %>% forestplot(labeltext = list(analysis_text=list("Treat all", expression
   fp_add_header(analysis_text = "Strategy", treat_text = "Proportion of\npopulation treated", arr_text = "", nnt = "NNT")
 
 
-grid.text("Absolute risk for HF in SGLT2i treated group", 
+grid.text("Absolute benefit for HF in SGLT2i treated group", 
           x = 0.7, 
           y = unit(1, "npc") - unit(1.1, "lines"), 
           gp = gpar(fontsize = 19, fontface = "bold"))
@@ -357,7 +357,7 @@ plot <- grid.arrange(arrangeGrob(
   p1[[4]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)), ncol=2, nrow=2, widths=c(1,1)))
 
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/main_strategies.tiff", width=10, height=12, units = "in", res=800)
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/Figure_4.tiff", width=10, height=12, units = "in", res=500)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("a) ADA/EASD guidance strategy", "b) SABRE model restricted strategy"), size = 20,  hjust=0, x = c(0, 0), y = c(1, 0.475))
