@@ -58,7 +58,7 @@ summary(cohort$qdhf_sglt2_benefit*100)
 # 0.02814  0.55854  1.00996  1.36487  1.79742 14.09242 
 
 # setwd("/slade/CPRD_data/Katie SGLT2/Plots/")
-# tiff("histogram_benefits.tiff", width=9, height=5, units = "in", res=800)
+# tiff("histogram_benefits.tiff", width=9, height=5, units = "in", res=600)
 # 
 # ggplot(cohort, aes(x=qdhf_sglt2_benefit*100)) +
 #   geom_histogram(aes(y = after_stat(count / sum(count))*100), binwidth=0.1, alpha=0.5, position="identity") +

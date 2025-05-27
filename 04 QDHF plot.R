@@ -23,6 +23,7 @@ rm(list=ls())
 # 1 Cohort selection and variable setup
 
 setwd("/slade/CPRD_data/Katie SGLT2/Processed data/")
+load("treatment_outcome_cohort_jun24.rda")
 #169,041
 
 table(cohort$studydrug)
@@ -81,7 +82,7 @@ obs_v_pred <- cbind(predicted, observed) %>%
 
 dodge <- position_dodge(width=0.3)
 
-tiff("../../Plots/QDHF_median.tiff", width=9, height=7, units = "in", res=800) 
+tiff("../../Plots/QDHF_median.tiff", width=9, height=7, units = "in", res=600) 
 
 ggplot(data=obs_v_pred, aes(x=qdhf_decile)) +
   geom_point(aes(y = observed*100, color="observed", shape="observed"), size=3, position=dodge) +

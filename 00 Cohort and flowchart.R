@@ -296,7 +296,7 @@ k -> m;
 
 setwd("/slade/CPRD_data/Katie SGLT2/Plots/")
 
-DPI=800
+DPI=600
 grViz(plot) %>%
   export_svg() %>%
   charToRaw %>%

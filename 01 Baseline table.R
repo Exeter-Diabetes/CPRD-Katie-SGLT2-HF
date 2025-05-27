@@ -170,7 +170,7 @@ label(cohort$overlap_weight) <- "overlap_weight"
 new_names <- data.frame(names=names(cohort), labels=(cohort %>% map_chr(attr_getter("label"))))
     
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/love_plot.tiff", width=8, height=10, units = "in", res=800)          
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/love_plot.tiff", width=8, height=10, units = "in", res=600)          
        
 love.plot(studydrug ~ malesex + dstartdate_age + dstartdate_dm_dur_all + ethnicity_decoded + imd_quintiles + smoker_decoded + hypertension + predrug_af + hosp_admission_prev_year_count + prebmi + prehba1c2yrs + presbp + precholhdl + drugline_all + ncurrtx_cat + INS + initiation_year + qdiabeteshf_5yr_score, data = cohort, weights = cohort$overlap_weight,
           method = "weighting", estimand = "ATE",  var.names = new_names, sample.names = c("Unweighted", "Overlap weighted"), binary="std") +

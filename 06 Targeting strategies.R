@@ -420,7 +420,7 @@ names(survfit_list$nice_qrisk2_10_N$strata) <- c("DPP4/SU", "SGLT2")
 names(survfit_list$sabre_matched_adaeasd_N$strata) <- c("DPP4/SU", "SGLT2")
 
 p1 <- ggsurvplot_list(survfit_list,
-                      data=main_strategies,
+                      data=other_strategies,
                       title=c(
                         paste0("SGLT2i not recommended\n(n=34,161 [", round_pad(100*(nrow(nice_qrisk2_10_N)/nrow(cohort)),1),"%])"), 
                         paste0("SGLT2i recommended\n(n=134,880 [", round_pad(100*(nrow(nice_qrisk2_10_Y)/nrow(cohort)),1),"%])"), 
@@ -465,7 +465,7 @@ plot <- grid.arrange(arrangeGrob(
   ncol=2, nrow=2, widths=c(1,1)))
  
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_A.tiff", width=10, height=10, units = "in", res=800)
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_A.tiff", width=10, height=10, units = "in", res=600)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("a) UK NICE guidance strategy", "b) SABRE model matched to NICE"), size = 20,  hjust=0, x = c(0, 0), y = c(1, 0.47))
@@ -485,7 +485,7 @@ plot <- grid.arrange(arrangeGrob(
 
 
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_B.tiff", width=10, height=15, units = "in", res=800)
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_B.tiff", width=10, height=15, units = "in", res=600)
 
 as_ggplot(plot) +    
   draw_plot_label(label = c("c) SABRE model matched to ADA/EASD", "d) QRISK2 model matched to ADA/EASD", "e) QRISK2 restricted strategy"), size = 20,  hjust=0, x = c(0, 0, 0), y = c(1, 0.647, 0.315))
