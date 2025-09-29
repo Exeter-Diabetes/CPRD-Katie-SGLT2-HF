@@ -121,6 +121,61 @@ cstat_lower <- round(summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$co
 cstat_upper <- round(summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2]), 3)
 #0.72 (0.70, 0.73)
 
+### Males
+males <- dpp4su %>% filter(malesex==1)
+surv_mod <- coxph(Surv(hf_censtime_yrs, hf_censvar)~qdhf_survival, data=males, method="breslow")
+cstat <- round(summary(surv_mod)$concordance[1], 3)
+cstat_lower <- round(summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2]), 3)
+cstat_upper <- round(summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2]), 3)
+# 0.71 (0.69, 0.73)
+
+### Females
+females <- dpp4su %>% filter(malesex==0)
+surv_mod <- coxph(Surv(hf_censtime_yrs, hf_censvar)~qdhf_survival, data=females, method="breslow")
+cstat <- round(summary(surv_mod)$concordance[1], 3)
+cstat_lower <- round(summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2]), 3)
+cstat_upper <- round(summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2]), 3)
+# 0.72 (0.71, 0.74)
+
+
+### Ethnicity
+dpp4su <- dpp4su %>%
+  mutate(ethnicity_decoded=factor(case_when(ethnicity_qrisk2_decoded=="missing" ~"Missing",
+                                            ethnicity_qrisk2_decoded=="White" ~"White",
+                                            ethnicity_qrisk2_decoded=="Indian" | ethnicity_qrisk2_decoded=="Pakistani" |  ethnicity_qrisk2_decoded=="Bangladeshi" | ethnicity_qrisk2_decoded=="Other Asian" ~"Asian",
+                                            ethnicity_qrisk2_decoded=="Black Caribbean" | ethnicity_qrisk2_decoded=="Black African" ~"Black",
+                                            ethnicity_qrisk2_decoded=="Chinese" | ethnicity_qrisk2_decoded=="Other" ~"Other"), levels=c("White", "Asian", "Black", "Other", "Missing")))
+
+
+ethnic_subgroup <- dpp4su %>% filter(ethnicity_decoded=="White")
+surv_mod <- coxph(Surv(hf_censtime_yrs, hf_censvar)~qdhf_survival, data=ethnic_subgroup, method="breslow")
+round(summary(surv_mod)$concordance[1], 3)
+round(summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2]), 3)
+round(summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2]), 3)
+#0.71 (0.69, 0.72)
+
+ethnic_subgroup <- dpp4su %>% filter(ethnicity_decoded=="Asian")
+surv_mod <- coxph(Surv(hf_censtime_yrs, hf_censvar)~qdhf_survival, data=ethnic_subgroup, method="breslow")
+round(summary(surv_mod)$concordance[1], 3)
+round(summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2]), 3)
+round(summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2]), 3)
+#0.72 (0.68, 0.76)
+
+ethnic_subgroup <- dpp4su %>% filter(ethnicity_decoded=="Black")
+surv_mod <- coxph(Surv(hf_censtime_yrs, hf_censvar)~qdhf_survival, data=ethnic_subgroup, method="breslow")
+round(summary(surv_mod)$concordance[1], 3)
+round(summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2]), 3)
+round(summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2]), 3)
+#0.78 (0.72, 0.83)
+
+ethnic_subgroup <- dpp4su %>% filter(ethnicity_decoded=="Other")
+surv_mod <- coxph(Surv(hf_censtime_yrs, hf_censvar)~qdhf_survival, data=ethnic_subgroup, method="breslow")
+round(summary(surv_mod)$concordance[1], 3)
+round(summary(surv_mod)$concordance[1]-(1.96*summary(surv_mod)$concordance[2]), 3)
+round(summary(surv_mod)$concordance[1]+(1.96*summary(surv_mod)$concordance[2]), 3)
+#0.70 (0.63, 0.77)
+
+
 
 ## Alternative method
 

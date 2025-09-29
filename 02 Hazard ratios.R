@@ -685,3 +685,172 @@ model <- coxph(f_adjusted, cohort)
 #Not as much as AF though = 3.04 (2.46, 3.75
 
 
+
+
+## By ethnicity
+
+cohort <- cohort %>%
+  mutate(ethnicity_decoded=factor(case_when(ethnicity_qrisk2_decoded=="missing" ~"Missing",
+                                            ethnicity_qrisk2_decoded=="White" ~"White",
+                                            ethnicity_qrisk2_decoded=="Indian" | ethnicity_qrisk2_decoded=="Pakistani" |  ethnicity_qrisk2_decoded=="Bangladeshi" | ethnicity_qrisk2_decoded=="Other Asian" ~"Asian",
+                                            ethnicity_qrisk2_decoded=="Black Caribbean" | ethnicity_qrisk2_decoded=="Black African" ~"Black",
+                                            ethnicity_qrisk2_decoded=="Chinese" | ethnicity_qrisk2_decoded=="Other" ~"Other"), levels=c("White", "Asian", "Black", "Other", "Missing")))
+
+
+white <- cohort %>% filter(ethnicity_decoded=="White")
+
+return_cov_set("weight")
+# remove ethnicity
+
+ps.formula.ethnicity <- formula(paste("studydrug ~ dstartdate_age + dstartdate_dm_dur_all + malesex + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + prebmi + prehba1c2yrs + presbp + drugline_all + ncurrtx_cat + INS + initiation_year + qdiabeteshf_5yr_score"))
+
+return_cov_set("adjust")
+# remove sex
+
+f_adjusted_ethnicity <- as.formula(Surv(hf_censtime_yrs, hf_censvar) ~  studydrug + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + malesex + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + drugline_all + ncurrtx_cat + INS + initiation_year + qdiabeteshf_5yr_score)
+
+overlap <- SumStat(ps.formula=ps.formula.ethnicity, data = as.data.frame(white), weight = c("IPW", "overlap"))
+
+white$overlap_weights <- overlap$ps.weights$overlap
+
+all_eth_count <- white %>%
+  group_by(studydrug) %>%
+  summarise(total_count=n(),
+            event_count=sum(hf_censvar),
+            total_time=sum(hf_censtime_yrs),
+            count=paste0(event_count, "/", total_count),
+            ir=round_pad((event_count*1000)/total_time, 2)) %>%
+  select(-c(total_count, event_count, total_time)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_{.value}",
+              values_from=c(count, ir))
+
+all_eth_adjoverlap <- coxph(f_adjusted_ethnicity, white, weights=overlap_weights) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  select(estimate, conf.low, conf.high) %>%
+  mutate(analysis="white")
+
+
+asian <- cohort %>% filter(ethnicity_decoded=="Asian")
+
+overlap <- SumStat(ps.formula=ps.formula.ethnicity, data = as.data.frame(asian), weight = c("IPW", "overlap"))
+
+asian$overlap_weights <- overlap$ps.weights$overlap
+
+eth_count <- asian %>%
+  group_by(studydrug) %>%
+  summarise(total_count=n(),
+            event_count=sum(hf_censvar),
+            total_time=sum(hf_censtime_yrs),
+            count=paste0(event_count, "/", total_count),
+            ir=round_pad((event_count*1000)/total_time, 2)) %>%
+  select(-c(total_count, event_count, total_time)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_{.value}",
+              values_from=c(count, ir))
+
+eth_adjoverlap <- coxph(f_adjusted_ethnicity, asian, weights=overlap_weights) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  select(estimate, conf.low, conf.high) %>%
+  mutate(analysis="asian")
+
+
+all_eth_count <- all_eth_count %>% rbind(eth_count)
+all_eth_adjoverlap <- all_eth_adjoverlap %>% rbind(eth_adjoverlap)
+
+
+black <- cohort %>% filter(ethnicity_decoded=="Black")
+
+overlap <- SumStat(ps.formula=ps.formula.ethnicity, data = as.data.frame(black), weight = c("IPW", "overlap"))
+
+black$overlap_weights <- overlap$ps.weights$overlap
+
+eth_count <- black %>%
+  group_by(studydrug) %>%
+  summarise(total_count=n(),
+            event_count=sum(hf_censvar),
+            total_time=sum(hf_censtime_yrs),
+            count=paste0(event_count, "/", total_count),
+            ir=round_pad((event_count*1000)/total_time, 2)) %>%
+  select(-c(total_count, event_count, total_time)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_{.value}",
+              values_from=c(count, ir))
+
+eth_adjoverlap <- coxph(f_adjusted_ethnicity, black, weights=overlap_weights) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  select(estimate, conf.low, conf.high) %>%
+  mutate(analysis="black")
+
+all_eth_count <- all_eth_count %>% rbind(eth_count)
+all_eth_adjoverlap <- all_eth_adjoverlap %>% rbind(eth_adjoverlap)
+
+
+other <- cohort %>% filter(ethnicity_decoded=="Other")
+
+overlap <- SumStat(ps.formula=ps.formula.ethnicity, data = as.data.frame(other), weight = c("IPW", "overlap"))
+
+other$overlap_weights <- overlap$ps.weights$overlap
+
+eth_count <- other %>%
+  group_by(studydrug) %>%
+  summarise(total_count=n(),
+            event_count=sum(hf_censvar),
+            total_time=sum(hf_censtime_yrs),
+            count=paste0(event_count, "/", total_count),
+            ir=round_pad((event_count*1000)/total_time, 2)) %>%
+  select(-c(total_count, event_count, total_time)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_{.value}",
+              values_from=c(count, ir))
+
+eth_adjoverlap <- coxph(f_adjusted_ethnicity, other, weights=overlap_weights) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  select(estimate, conf.low, conf.high) %>%
+  mutate(analysis="other")
+
+all_eth_count <- all_eth_count %>% rbind(eth_count)
+all_eth_adjoverlap <- all_eth_adjoverlap %>% rbind(eth_adjoverlap)
+
+
+missing <- cohort %>% filter(ethnicity_decoded=="Missing")
+
+overlap <- SumStat(ps.formula=ps.formula.ethnicity, data = as.data.frame(missing), weight = c("IPW", "overlap"))
+
+missing$overlap_weights <- overlap$ps.weights$overlap
+
+eth_count <- missing %>%
+  group_by(studydrug) %>%
+  summarise(total_count=n(),
+            event_count=sum(hf_censvar),
+            total_time=sum(hf_censtime_yrs),
+            count=paste0(event_count, "/", total_count),
+            ir=round_pad((event_count*1000)/total_time, 2)) %>%
+  select(-c(total_count, event_count, total_time)) %>%
+  pivot_wider(names_from=studydrug,
+              names_glue="{studydrug}_{.value}",
+              values_from=c(count, ir))
+
+eth_adjoverlap <- coxph(f_adjusted_ethnicity, missing, weights=overlap_weights) %>%
+  tidy(conf.int=TRUE, exponentiate=TRUE) %>%
+  filter(term=="studydrugSGLT2") %>%
+  select(estimate, conf.low, conf.high) %>%
+  mutate(analysis="missing")
+
+all_eth_count <- all_eth_count %>% rbind(eth_count)
+all_eth_adjoverlap <- all_eth_adjoverlap %>% rbind(eth_adjoverlap)
+
+
+
+model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~  studydrug*ethnicity_decoded + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + malesex + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + drugline_all + ncurrtx_cat + INS + initiation_year + qdiabeteshf_5yr_score, data=cohort, x=T, y=T)
+
+anova(model)
+
+
+
+
+
