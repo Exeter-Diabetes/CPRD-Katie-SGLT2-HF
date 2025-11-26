@@ -64,7 +64,7 @@ predicted <- dpp4su %>%
 observed <- survfit(Surv(hf_censtime_yrs, hf_censvar) ~ qdhf_decile, data=dpp4su) %>%
   tidy() %>%
   group_by(strata) %>%
-  filter(time==max(time)) %>%
+  filter(time==5) %>%
   mutate(observed=1-estimate,
          lower_ci=1-conf.low,
          upper_ci=1-conf.high)

@@ -148,7 +148,7 @@ cohort <- cohort %>% mutate(sabre_matched_nice=ifelse((qdhf_sglt2_benefit*100)>0
 
 ############################################################################################
 
-# 5 Figures for plot
+# 5 Figures for plot - don't include NICE/QRISK
 
 ## Absolute risk reduction (benefit) per 100 patient-years and NNT as per: https://dom-pubs.pericles-prod.literatumonline.com/doi/full/10.1111/dom.14893)
 
@@ -156,12 +156,15 @@ cohort <- cohort %>% mutate(sabre_matched_nice=ifelse((qdhf_sglt2_benefit*100)>0
 
 cohort <- cohort %>% mutate(treat_all=1)
 
-strategies <- c("treat_all", "nice_qrisk2_10", "ada_easd", "sabre_matched_nice", "sabre_matched_adaeasd", "sabre_restricted", "qrisk2_matched_adaeasd", "qrisk2_restricted")
+#strategies <- c("treat_all", "nice_qrisk2_10", "ada_easd", "sabre_matched_nice", "sabre_matched_adaeasd", "sabre_restricted", "qrisk2_matched_adaeasd", "qrisk2_restricted")
+
+strategies <- c("treat_all", "ada_easd", "sabre_matched_adaeasd", "sabre_restricted")
+
 
 table <- data.frame(strategy=character(), treat=character(), arr=numeric(), arr_lower_ci=numeric(), arr_upper_ci=numeric(), nnt=character())
 
 boot_fn <- function(data, indices) {
-
+  
   d <- data[indices, ]
   
   n <- nrow(d)
@@ -213,9 +216,9 @@ for (i in strategies) {
 
 table <- table %>% mutate(arr_text=paste0(round_pad(arr, 2), " (", round_pad(arr_lower_ci, 2), "-", round_pad(arr_upper_ci, 2), ")")) %>% rename(mean=arr, lower=arr_lower_ci, upper=arr_upper_ci)
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/Figure_3.tiff", width=16, height=6, units = "in", res=600) 
+tiff("/ky279/OneDrive - University of Exeter/CPRD/2025/SGLT2 CVD project/Plots/Figure_3A.tiff", width=16, height=4, units = "in", res=600) 
 
-table %>% forestplot(labeltext = list(analysis_text=list("Treat all", expression("UK NICE guidance "^1), expression("ADA/EASD guidance "^2), expression("SABRE model matched to NICE "^3), expression("SABRE model matched to ADA/EASD "^4), expression("SABRE model restricted strategy "^5), expression("QRISK2 matched to ADA/EASD "^6), expression("QRISK2 restricted strategy "^7)), treat_text=table$treat, arr_text=table$arr_text, nnt=table$nnt),
+table %>% forestplot(labeltext = list(analysis_text=list("Treat all", "ADA/EASD guidance", "SABRE model aligned with ADA/EASD", "SABRE model restricted strategy"), treat_text=table$treat, arr_text=table$arr_text, nnt=table$nnt),
                      ci.vertices = TRUE,
                      #xlab = "Events prevented per 100 patient-years",
                      fn.ci_norm = fpDrawCircleCI,
@@ -244,11 +247,9 @@ grid.text("Events prevented per 100 patient-year (95% CI)",
 dev.off()
 
 
-
-
 ############################################################################################
 
-# 6 Km plots - weight within subgroups
+# 6 Km plots - weighted within subgroups
 
 source("full_covariate_set.R")
 ps.formula <- formula(paste0("studydrug ~ ", return_cov_set("weight")))
@@ -304,7 +305,7 @@ for (i in unique(main_strategies$subgp)) {
   surv_sglt2 <- (1-test$surv[closest_index_sglt2])*100
   surv_upper_sglt2 <- (1-test$lower[closest_index_sglt2])*100
   surv_lower_sglt2 <- (1-test$upper[closest_index_sglt2])*100
-
+  
   data <- data.frame(group=i, surv_dpp4su, surv_lower_dpp4su, surv_upper_dpp4su, surv_sglt2, surv_lower_sglt2, surv_upper_sglt2) %>%
     mutate(surv_diff=surv_dpp4su-surv_sglt2,
            SE1=(surv_upper_dpp4su - surv_lower_dpp4su) / (2 * 1.96),
@@ -357,10 +358,10 @@ plot <- grid.arrange(arrangeGrob(
   p1[[4]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)), ncol=2, nrow=2, widths=c(1,1)))
 
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/Figure_4.tiff", width=10, height=12, units = "in", res=500)
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/Figure_3B.tiff", width=10, height=12, units = "in", res=500)
 
 as_ggplot(plot) +    
-  draw_plot_label(label = c("a) ADA/EASD guidance strategy", "b) SABRE model restricted strategy"), size = 20,  hjust=0, x = c(0, 0), y = c(1, 0.475))
+  draw_plot_label(label = c("ADA/EASD guidance strategy", "SABRE model restricted strategy"), size = 20,  hjust=0, x = c(0, 0), y = c(1, 0.475))
 
 dev.off()
 
@@ -368,10 +369,14 @@ dev.off()
 
 
 
-## NICE, SABRE-matched NICE, SABRE matched ADAEASD, QRISK2 matched ADAEASD, QRISK2 restricted
+## SABRE matched ADAEASD
 
-other_strategies <- rbind(nice_qrisk2_10_N, nice_qrisk2_10_Y, sabre_matched_nice_N, sabre_matched_nice_Y, sabre_matched_adaeasd_N, sabre_matched_adaeasd_Y, qrisk2_matched_adaeasd_N, qrisk2_matched_adaeasd_Y, qrisk2_restricted_N, qrisk2_restricted_Y) %>%
-  mutate(subgp=factor(subgp, levels=c("nice_qrisk2_10_N", "nice_qrisk2_10_Y", "sabre_matched_nice_N", "sabre_matched_nice_Y", "sabre_matched_adaeasd_N", "sabre_matched_adaeasd_Y", "qrisk2_matched_adaeasd_N", "qrisk2_matched_adaeasd_Y", "qrisk2_restricted_N", "qrisk2_restricted_Y")))
+# other_strategies <- rbind(nice_qrisk2_10_N, nice_qrisk2_10_Y, sabre_matched_nice_N, sabre_matched_nice_Y, sabre_matched_adaeasd_N, sabre_matched_adaeasd_Y, qrisk2_matched_adaeasd_N, qrisk2_matched_adaeasd_Y, qrisk2_restricted_N, qrisk2_restricted_Y) %>%
+#   mutate(subgp=factor(subgp, levels=c("nice_qrisk2_10_N", "nice_qrisk2_10_Y", "sabre_matched_nice_N", "sabre_matched_nice_Y", "sabre_matched_adaeasd_N", "sabre_matched_adaeasd_Y", "qrisk2_matched_adaeasd_N", "qrisk2_matched_adaeasd_Y", "qrisk2_restricted_N", "qrisk2_restricted_Y")))
+
+
+other_strategies <- rbind(sabre_matched_adaeasd_N, sabre_matched_adaeasd_Y) %>%
+  mutate(subgp=factor(subgp, levels=c("sabre_matched_adaeasd_N", "sabre_matched_adaeasd_Y")))
 
 
 table(other_strategies$subgp)
@@ -416,22 +421,13 @@ for (i in unique(other_strategies$subgp)) {
 
 ### Km plot
 
-names(survfit_list$nice_qrisk2_10_N$strata) <- c("DPP4/SU", "SGLT2")
 names(survfit_list$sabre_matched_adaeasd_N$strata) <- c("DPP4/SU", "SGLT2")
 
 p1 <- ggsurvplot_list(survfit_list,
                       data=other_strategies,
                       title=c(
-                        paste0("SGLT2i not recommended\n(n=34,161 [", round_pad(100*(nrow(nice_qrisk2_10_N)/nrow(cohort)),1),"%])"), 
-                        paste0("SGLT2i recommended\n(n=134,880 [", round_pad(100*(nrow(nice_qrisk2_10_Y)/nrow(cohort)),1),"%])"), 
-                        paste0("SGLT2i not recommended\n(n=34,161 [", round_pad(100*(nrow(sabre_matched_nice_N)/nrow(cohort)),1),"%])"),
-                        paste0("SGLT2i recommended\n(n=134,880 [", round_pad(100*(nrow(sabre_matched_nice_Y)/nrow(cohort)),1),"%])"),
                         paste0("SGLT2i not recommended\n(n=84,359 [", round_pad(100*(nrow(sabre_matched_adaeasd_N)/nrow(cohort)),1),"%])"),
-                        paste0("SGLT2i recommended\n(n=84,682 [", round_pad(100*(nrow(sabre_matched_adaeasd_Y)/nrow(cohort)),1),"%])"),
-                        paste0("SGLT2i not recommended\n(n=84,359 [", round_pad(100*(nrow(qrisk2_matched_adaeasd_N)/nrow(cohort)),1),"%])"),
-                        paste0("SGLT2i recommended\n(n=84,682 [", round_pad(100*(nrow(qrisk2_matched_adaeasd_Y)/nrow(cohort)),1),"%])"),
-                        paste0("SGLT2i not recommended\n(n=147,870 [", round_pad(100*(nrow(qrisk2_restricted_N)/nrow(cohort)),1),"%])"),
-                        paste0("SGLT2i recommended\n(n=21,171 [", round_pad(100*(nrow(qrisk2_restricted_Y)/nrow(cohort)),1),"%])")),
+                        paste0("SGLT2i recommended\n(n=84,682 [", round_pad(100*(nrow(sabre_matched_adaeasd_Y)/nrow(cohort)),1),"%])")),
                       size= 1.5,
                       fun = function(x) {100 - x*100},
                       conf.int = T,
@@ -446,48 +442,19 @@ p1 <- ggsurvplot_list(survfit_list,
                       palette = c("#782e6a","#E69F00"))
 
 
-p1[[1]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n0.2% (95% CI: -0.5 to 0.9%)"
-p1[[2]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n1.5% (95% CI: 1.0 to 2.1%)"
-p1[[3]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n-0.2% (95% CI: -0.8 to 0.4%)"
-p1[[4]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n1.6% (95% CI: 1.0 to 2.2%)"
-p1[[5]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n0.5% (95% CI: 0.0 to 1.0%)"
-p1[[6]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n1.8% (95% CI: 1.0 to 2.6%)"
-p1[[7]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n0.6% (95% CI: 0.1 to 1.0%)"
-p1[[8]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n1.8% (95% CI: 1.0 to 2.6%)"
-p1[[9]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n1.1% (95% CI: 0.6 to 1.5%)"
-p1[[10]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n2.6% (95% CI: 0.5 to 4.7%)"
+p1[[1]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n0.5% (95% CI: 0.0 to 1.0%)"
+p1[[2]][["plot"]][["labels"]][["subtitle"]] <- "Observed 5-year benefit with SGLT2i:\n1.8% (95% CI: 1.0 to 2.6%)"
 
 plot <- grid.arrange(arrangeGrob(
   p1[[1]][["plot"]] + theme(legend.position=c(0.5, 0.5), legend.title=element_blank(), legend.text=element_text(size=16, face="bold"), plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5, margin=margin(b=5, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5)) + guides(colour = guide_legend(nrow = 1)),
   p1[[2]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5, margin=margin(b=5, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5)),
-  p1[[3]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)),
-  p1[[4]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)),
-  ncol=2, nrow=2, widths=c(1,1)))
- 
+  ncol=2, nrow=1, widths=c(1,1)))
 
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_A.tiff", width=10, height=10, units = "in", res=600)
+
+tiff("/slade/CPRD_data/Katie SGLT2/Plots/supp_fig_6.tiff", width=10, height=6, units = "in", res=600)
 
 as_ggplot(plot) +    
-  draw_plot_label(label = c("a) UK NICE guidance strategy", "b) SABRE model matched to NICE"), size = 20,  hjust=0, x = c(0, 0), y = c(1, 0.47))
+  draw_plot_label(label = "SABRE model aligned with ADA/EASD", size = 20,  hjust=0, x = 0, y = 1)
 
 dev.off()
 
-
-
-plot <- grid.arrange(arrangeGrob(
-  p1[[5]][["plot"]] + theme(legend.position=c(0.5, 0.5), legend.title=element_blank(), legend.text=element_text(size=16, face="bold"), plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5, margin=margin(b=5, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5)) + guides(colour = guide_legend(nrow = 1)),
-  p1[[6]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)),
-  p1[[7]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)),
-  p1[[8]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)),
-  p1[[9]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)),
-  p1[[10]][["plot"]] + theme(legend.position="none", plot.title=element_text(face="bold", hjust=0.5, vjust=-0.5,  margin=margin(b=-6, t=40), size = 18), plot.subtitle=element_text(hjust=0, vjust=-10, margin=margin(b=-25, l=10), size = 16), axis.title.y=element_text(vjust=-0.3), plot.margin=margin(l=5, r=5, t=24)),
-  ncol=2, nrow=3, widths=c(1,1)))
-
-
-
-tiff("/slade/CPRD_data/Katie SGLT2/Plots/other_strategies_B.tiff", width=10, height=15, units = "in", res=600)
-
-as_ggplot(plot) +    
-  draw_plot_label(label = c("c) SABRE model matched to ADA/EASD", "d) QRISK2 model matched to ADA/EASD", "e) QRISK2 restricted strategy"), size = 20,  hjust=0, x = c(0, 0, 0), y = c(1, 0.647, 0.315))
-
-dev.off()

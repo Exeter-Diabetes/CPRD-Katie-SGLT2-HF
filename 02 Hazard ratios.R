@@ -846,11 +846,4 @@ all_eth_adjoverlap <- all_eth_adjoverlap %>% rbind(eth_adjoverlap)
 
 
 
-model <- cph(Surv(hf_censtime_yrs, hf_censvar) ~  studydrug*ethnicity_decoded + rcs(dstartdate_age,5) + rcs(dstartdate_dm_dur_all,5) + malesex + imd2015_10 + qrisk2_smoking_cat + hypertension + predrug_af + hosp_admission_prev_year_count + rcs(prebmi,5) + rcs(prehba1c2yrs,5) + rcs(presbp,5) + drugline_all + ncurrtx_cat + INS + initiation_year + qdiabeteshf_5yr_score, data=cohort, x=T, y=T)
-
-anova(model)
-
-
-
-
 

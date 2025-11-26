@@ -210,7 +210,7 @@ cal_plot <- ggplot(data=plot.data, aes(x=pred,y=obs.gp)) +
 
 
 cal_plot <- cal_plot +
-  annotate(geom="text", x=0.1, y=4.8, label="Overall median observed benefit (IQR): 0.90% (0.51-1.6%)\nOverall median predicted benefit: 1.0%", color="black", hjust=0, size = 5)
+  annotate(geom="text", x=0.1, y=4.8, label="Overall median observed benefit (IQR): 0.90% (0.51-1.6%)\nOverall median predicted benefit: 1.0%", color="black", hjust=0, size = 6)
 
 
 hist_plot <- ggplot(cohort, aes(x=qdhf_sglt2_benefit*100)) +
@@ -234,9 +234,9 @@ hist_plot <- ggplot(cohort, aes(x=qdhf_sglt2_benefit*100)) +
 
 
 setwd("/slade/CPRD_data/Katie SGLT2/Plots/")
-tiff("Figure_2.tiff", width=8, height=8, units = "in", res=600) 
+tiff("Figure_2.tiff", width=9, height=9, units = "in", res=600) 
 
-plot_grid(cal_plot, hist_plot, ncol = 1,align = 'v',
+cowplot::plot_grid(cal_plot, hist_plot, ncol = 1,align = 'v',
           rel_heights = c(1,0.5), rel_widths = c(1,1))
 
 dev.off()  
